@@ -20,7 +20,9 @@ function Library.new(title)
 
     self.ScreenGui = screenGui
     self.Columns = {}
-    self.ToggleKey = Enum.KeyCode.RightControl
+
+    -- БИНД ПО УМОЛЧАНИЮ: Клавиша K
+    self.ToggleKey = Enum.KeyCode.K
     self.ColumnWidth = 180
     self.ColumnHeight = 400
 
@@ -105,7 +107,6 @@ function Library:AddColumn(title)
     headerText.TextSize = 14
     headerText.Parent = header
 
-    -- ScrollingFrame с авто-расчетом размера контента
     local container = Instance.new("ScrollingFrame")
     container.Name = "Container"
     container.Size = UDim2.new(1, -8, 1, -40)
@@ -123,7 +124,7 @@ function Library:AddColumn(title)
 
     local padding = Instance.new("UIPadding")
     padding.PaddingTop = UDim.new(0, 2)
-    padding.PaddingBottom = UDim.new(0, 4)
+    padding.PaddingBottom = UDim.new(0, 6)
     padding.Parent = container
 
     local colObj = {

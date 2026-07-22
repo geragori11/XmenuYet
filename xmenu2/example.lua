@@ -55,7 +55,8 @@ local configCol = UI:AddColumn("Configs")
 
 AddSection(configCol.Container, "Menu Settings")
 
-local keyNames = {"RightControl", "Insert", "RightShift"}
+-- Список биндов (K добавлен в список)
+local keyNames = {"K", "RightControl", "Insert", "RightShift"}
 AddDropdown(configCol.Container, "Menu Keybind", keyNames, function(selectedKey)
     if Enum.KeyCode[selectedKey] then
         UI.ToggleKey = Enum.KeyCode[selectedKey]
