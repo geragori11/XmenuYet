@@ -5,6 +5,13 @@ local Theme = import("src/Theme.lua")
 local ConfigManager = {}
 ConfigManager.FolderPath = "xmenu2_configs"
 
+-- Вспомогательная функция: убираем .json в конце (если есть)
+function ConfigManager.NormalizeConfigName(name)
+    if not name or name == "" then return name end
+    -- Удаляем .json в конце (регистронезависимо)
+    return name:gsub("%.json$", "", 1):gsub("%.JSON$", "", 1)
+end
+
 function ConfigManager.EnsureFolder()
     if not isfolder(ConfigManager.FolderPath) then
         makefolder(ConfigManager.FolderPath)
@@ -12,6 +19,12 @@ function ConfigManager.EnsureFolder()
 end
 
 function ConfigManager.Save(configName, libraryObj)
+    configName = ConfigManager.NormalizeConfigName(configName)
+    if not configName or configName == "" then
+        print("[Config] Ошибка: имя конфига не может быть пустым")
+        return
+    end
+
     ConfigManager.EnsureFolder()
     local path = ConfigManager.FolderPath .. "/" .. configName .. ".json"
 
@@ -39,6 +52,9 @@ function ConfigManager.Save(configName, libraryObj)
 end
 
 function ConfigManager.Load(configName, libraryObj)
+    configName = ConfigManager.NormalizeConfigName(configName)
+    if not configName or configName == "" then return end
+
     local path = ConfigManager.FolderPath .. "/" .. configName .. ".json"
     if isfile(path) then
         local raw = readfile(path)
@@ -55,7 +71,10 @@ function ConfigManager.Load(configName, libraryObj)
 end
 
 function ConfigManager.Delete(configName)
-    ConfigManager.EnsureFolder()  -- на всякий случай
+    configName = ConfigManager.NormalizeConfigName(configName)
+    if not configName or configName == "" then return end
+
+    ConfigManager.EnsureFolder()
     local path = ConfigManager.FolderPath .. "/" .. configName .. ".json"
     if isfile(path) then
         delfile(path)
@@ -74,10 +93,11 @@ function ConfigManager.RenderUI(container, libraryObj)
 
     -- Поле ввода имени конфига
     AddTextInput(container, "Имя конфига...", function(txt)
+        -- Можно сразу нормализовать, но оставим для удобства пользователя
         currentConfigName = txt
     end)
 
-    -- Кнопка "Сохранить" с фиксированным LayoutOrder = 1 (всегда сверху)
+    -- Кнопка "Сохранить"
     local saveBtn = Instance.new("TextButton")
     saveBtn.Name = "SaveConfigButton"
     saveBtn.Size = UDim2.new(1, 0, 0, 26)
@@ -86,14 +106,14 @@ function ConfigManager.RenderUI(container, libraryObj)
     saveBtn.TextColor3 = Theme.AccentColor
     saveBtn.Font = Enum.Font.SourceSansBold
     saveBtn.TextSize = 12
-    saveBtn.LayoutOrder = 1   -- явно задаём порядок
+    saveBtn.LayoutOrder = 1
     saveBtn.Parent = container
 
     local saveCorner = Instance.new("UICorner")
     saveCorner.CornerRadius = Theme.ElementCorner
     saveCorner.Parent = saveBtn
 
-    -- Контейнер для списка конфигов (LayoutOrder = 2)
+    -- Контейнер для списка конфигов
     local listFrame = Instance.new("Frame")
     listFrame.Name = "ConfigListHolder"
     listFrame.Size = UDim2.new(1, 0, 0, 24)
@@ -108,7 +128,6 @@ function ConfigManager.RenderUI(container, libraryObj)
 
     -- Функция обновления списка
     ConfigManager.RefreshList = function()
-        -- Удаляем все дочерние элементы, кроме UIListLayout
         for _, child in ipairs(listFrame:GetChildren()) do
             if not child:IsA("UIListLayout") then
                 child:Destroy()
@@ -132,9 +151,8 @@ function ConfigManager.RenderUI(container, libraryObj)
             listFrame.Size = UDim2.new(1, 0, 0, fileCount * 34)
 
             for idx, filePath in ipairs(files) do
-                -- Надёжное извлечение имени файла (без пути и расширения)
+                -- Извлекаем имя файла (без пути и расширения)
                 local fileName = string.match(filePath, "([^/\\]+)%.json$") or filePath
-                -- если остался путь, берём только последнюю часть
                 if fileName:find("[/\\]") then
                     fileName = fileName:match("([^/\\]+)$") or fileName
                 end
@@ -193,7 +211,7 @@ function ConfigManager.RenderUI(container, libraryObj)
 
                 delBtn.MouseButton1Click:Connect(function()
                     ConfigManager.Delete(fileName)
-                    ConfigManager.RefreshList()   -- обновляем список после удаления
+                    ConfigManager.RefreshList()
                 end)
             end
         end
