@@ -103,14 +103,21 @@ return function(container, text, defaultColor, callback, flagName)
         end
     end
 
-    -- 2. Создание всплывающего окна (Popup)
+    -- 2. Создание всплывающего окна (Popup) с глобальным управлением
     local function openPopup()
         if popupOpen then return end
+
+        -- Закрыть предыдущий попап, если он существует
+        if _G.__CurrentColorPickerOverlay then
+            _G.__CurrentColorPickerOverlay:Destroy()
+            _G.__CurrentColorPickerOverlay = nil
+        end
+
         popupOpen = true
 
         local screenGui = container:FindFirstAncestorOfClass("ScreenGui") or game:GetService("CoreGui")
 
-        -- Тёмная подложка-оверлей (Frame вместо кнопки)
+        -- Тёмная подложка-оверлей
         local overlay = Instance.new("Frame")
         overlay.Name = "ColorPickerOverlay"
         overlay.Size = UDim2.new(1, 0, 1, 0)
@@ -118,6 +125,9 @@ return function(container, text, defaultColor, callback, flagName)
         overlay.BackgroundTransparency = 0.5
         overlay.ZIndex = 200
         overlay.Parent = screenGui
+
+        -- Сохраняем в глобальную переменную для закрытия при открытии нового
+        _G.__CurrentColorPickerOverlay = overlay
 
         -- Модальное окно выбора цвета
         local popup = Instance.new("Frame")
@@ -338,6 +348,7 @@ return function(container, text, defaultColor, callback, flagName)
             if overlayClickConn then overlayClickConn:Disconnect() end
             overlay:Destroy()
             popupOpen = false
+            _G.__CurrentColorPickerOverlay = nil
         end
 
         -- Закрытие только при клике строго вне popup

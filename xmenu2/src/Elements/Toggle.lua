@@ -62,15 +62,19 @@ return function(container, text, default, flagName, callback)
         state = newVal
         button.TextColor3 = state and Theme.AccentColor or Theme.TextColor
         if callback then callback(state) end
+
+        -- ОБНОВЛЕНИЕ ГЛОБАЛЬНОГО ФЛАГА
+        if flagName then
+            local Lib = import("init.lua")
+            if Lib.Flags and Lib.Flags[flagName] then
+                Lib.Flags[flagName].Value = state
+            end
+        end
     end
 
     -- Включение/выключение по ЛКМ
     button.MouseButton1Click:Connect(function()
         setState(not state)
-        if flagName then
-            local Lib = import("init.lua")
-            if Lib.Flags[flagName] then Lib.Flags[flagName].Value = state end
-        end
     end)
 
     -- Открытие/закрытие настроек по ПКМ
