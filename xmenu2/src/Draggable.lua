@@ -19,7 +19,7 @@ function Draggable.Enable(frame, dragHandle, onDragEnd)
                     if dragging then
                         dragging = false
                         if onDragEnd then
-                            onDragEnd(frame)
+                            onDragEnd(frame, startPos)
                         end
                     end
                 end

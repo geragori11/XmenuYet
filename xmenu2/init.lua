@@ -217,34 +217,27 @@ function Library:AddColumn(title, customWidth)
         Library = self
     }
 
-    -- Подключаем перетаскивание с двумя колбэками
-    Library.Draggable.Enable(columnFrame, header,
-        function(frame, startPos)
-            -- При старте запоминаем начальную позицию (можно использовать для чего-то ещё)
-            colObj.DragStartPos = startPos
-        end,
-        function(frame, startPos)
-            -- При завершении проверяем перекрытие
-            local overlap = false
-            for _, otherCol in ipairs(self.Columns) do
-                if otherCol.Frame ~= frame then
-                    if self:IsOverlappingMoreThan(frame, otherCol.Frame, 0.8) then
-                        overlap = true
-                        break
-                    end
+    -- Подключаем перетаскивание с одним колбэком, который получает frame и startPos
+    Library.Draggable.Enable(columnFrame, header, function(frame, startPos)
+        -- Проверяем перекрытие с другими колонками
+        local overlap = false
+        for _, otherCol in ipairs(self.Columns) do
+            if otherCol.Frame ~= frame then
+                if self:IsOverlappingMoreThan(frame, otherCol.Frame, 0.8) then
+                    overlap = true
+                    break
                 end
             end
-
-            if overlap then
-                -- Возвращаем на позицию, которая была до начала перетаскивания
-                frame.Position = startPos
-            else
-                -- Если перекрытия нет – запоминаем текущую позицию как "последнюю валидную"
-                -- (она же теперь будет стартовой при следующем перетаскивании)
-                colObj.InitialPos = frame.Position
-            end
         end
-    )
+
+        if overlap then
+            -- Возвращаем на стартовую позицию
+            frame.Position = startPos
+        else
+            -- Сохраняем текущую позицию как новую стартовую для будущих перетаскиваний
+            colObj.InitialPos = frame.Position
+        end
+    end)
 
     table.insert(self.Columns, colObj)
     return colObj
