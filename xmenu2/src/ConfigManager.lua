@@ -26,12 +26,11 @@ function ConfigManager.Save(configName, libraryObj)
         if ConfigManager.RefreshList then ConfigManager.RefreshList() end
     end
 
-    -- Проверка на существование файла для вызова подтверждения
     if isfile(path) then
         libraryObj:ShowConfirm(
             "Перезапись конфига",
             "Вы точно хотите сохранить изменения в уже существующий конфиг '" .. configName .. "'?",
-            function() DoSave() end,
+            DoSave,
             function() print("[Config] Сохранение отменено пользователем") end
         )
     else
@@ -44,7 +43,6 @@ function ConfigManager.Load(configName, libraryObj)
     if isfile(path) then
         local raw = readfile(path)
         local data = HttpService:JSONDecode(raw)
-
         if data then
             for flagKey, storedVal in pairs(data) do
                 if libraryObj.Flags[flagKey] and libraryObj.Flags[flagKey].Set then
@@ -57,9 +55,11 @@ function ConfigManager.Load(configName, libraryObj)
 end
 
 function ConfigManager.Delete(configName)
+    ConfigManager.EnsureFolder()  -- на всякий случай
     local path = ConfigManager.FolderPath .. "/" .. configName .. ".json"
     if isfile(path) then
         delfile(path)
+        print("[Config] Удалён:", configName)
     end
 end
 
@@ -72,10 +72,12 @@ function ConfigManager.RenderUI(container, libraryObj)
     local AddTextInput = import("src/Elements/TextInput.lua")
     local currentConfigName = "default"
 
+    -- Поле ввода имени конфига
     AddTextInput(container, "Имя конфига...", function(txt)
         currentConfigName = txt
     end)
 
+    -- Кнопка "Сохранить" с фиксированным LayoutOrder = 1 (всегда сверху)
     local saveBtn = Instance.new("TextButton")
     saveBtn.Name = "SaveConfigButton"
     saveBtn.Size = UDim2.new(1, 0, 0, 26)
@@ -84,18 +86,19 @@ function ConfigManager.RenderUI(container, libraryObj)
     saveBtn.TextColor3 = Theme.AccentColor
     saveBtn.Font = Enum.Font.SourceSansBold
     saveBtn.TextSize = 12
-    saveBtn.LayoutOrder = #container:GetChildren()
+    saveBtn.LayoutOrder = 1   -- явно задаём порядок
     saveBtn.Parent = container
 
     local saveCorner = Instance.new("UICorner")
     saveCorner.CornerRadius = Theme.ElementCorner
     saveCorner.Parent = saveBtn
 
+    -- Контейнер для списка конфигов (LayoutOrder = 2)
     local listFrame = Instance.new("Frame")
     listFrame.Name = "ConfigListHolder"
     listFrame.Size = UDim2.new(1, 0, 0, 24)
     listFrame.BackgroundTransparency = 1
-    listFrame.LayoutOrder = #container:GetChildren()
+    listFrame.LayoutOrder = 2
     listFrame.Parent = container
 
     local listLayout = Instance.new("UIListLayout")
@@ -103,14 +106,19 @@ function ConfigManager.RenderUI(container, libraryObj)
     listLayout.Padding = UDim.new(0, 4)
     listLayout.Parent = listFrame
 
+    -- Функция обновления списка
     ConfigManager.RefreshList = function()
+        -- Удаляем все дочерние элементы, кроме UIListLayout
         for _, child in ipairs(listFrame:GetChildren()) do
-            if not child:IsA("UIListLayout") then child:Destroy() end
+            if not child:IsA("UIListLayout") then
+                child:Destroy()
+            end
         end
 
         local files = ConfigManager.ListConfigs()
+        local fileCount = #files
 
-        if #files == 0 then
+        if fileCount == 0 then
             listFrame.Size = UDim2.new(1, 0, 0, 24)
             local emptyLabel = Instance.new("TextLabel")
             emptyLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -121,10 +129,15 @@ function ConfigManager.RenderUI(container, libraryObj)
             emptyLabel.TextSize = 11
             emptyLabel.Parent = listFrame
         else
-            listFrame.Size = UDim2.new(1, 0, 0, #files * 34)
+            listFrame.Size = UDim2.new(1, 0, 0, fileCount * 34)
 
             for idx, filePath in ipairs(files) do
-                local fileName = string.match(filePath, "([^/]+)%.json$") or filePath
+                -- Надёжное извлечение имени файла (без пути и расширения)
+                local fileName = string.match(filePath, "([^/\\]+)%.json$") or filePath
+                -- если остался путь, берём только последнюю часть
+                if fileName:find("[/\\]") then
+                    fileName = fileName:match("([^/\\]+)$") or fileName
+                end
 
                 local card = Instance.new("Frame")
                 card.Size = UDim2.new(1, 0, 0, 30)
@@ -148,7 +161,6 @@ function ConfigManager.RenderUI(container, libraryObj)
                 nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
                 nameLabel.Parent = card
 
-                -- Кнопка "Загрузить"
                 local loadBtn = Instance.new("TextButton")
                 loadBtn.Size = UDim2.new(0.32, 0, 0.8, 0)
                 loadBtn.Position = UDim2.new(0.39, 0, 0.1, 0)
@@ -158,7 +170,6 @@ function ConfigManager.RenderUI(container, libraryObj)
                 loadBtn.Font = Enum.Font.SourceSansBold
                 loadBtn.TextSize = 10
                 loadBtn.Parent = card
-
                 local loadCorner = Instance.new("UICorner")
                 loadCorner.CornerRadius = UDim.new(0, 4)
                 loadCorner.Parent = loadBtn
@@ -167,7 +178,6 @@ function ConfigManager.RenderUI(container, libraryObj)
                     ConfigManager.Load(fileName, libraryObj)
                 end)
 
-                -- Кнопка "Удалить"
                 local delBtn = Instance.new("TextButton")
                 delBtn.Size = UDim2.new(0.25, 0, 0.8, 0)
                 delBtn.Position = UDim2.new(0.72, 0, 0.1, 0)
@@ -177,25 +187,28 @@ function ConfigManager.RenderUI(container, libraryObj)
                 delBtn.Font = Enum.Font.SourceSansBold
                 delBtn.TextSize = 10
                 delBtn.Parent = card
-
                 local delCorner = Instance.new("UICorner")
                 delCorner.CornerRadius = UDim.new(0, 4)
                 delCorner.Parent = delBtn
 
                 delBtn.MouseButton1Click:Connect(function()
                     ConfigManager.Delete(fileName)
-                    ConfigManager.RefreshList()
+                    ConfigManager.RefreshList()   -- обновляем список после удаления
                 end)
             end
         end
     end
 
+    -- Обработчик сохранения
     saveBtn.MouseButton1Click:Connect(function()
         if currentConfigName and currentConfigName ~= "" then
             ConfigManager.Save(currentConfigName, libraryObj)
+        else
+            print("[Config] Имя конфига не может быть пустым")
         end
     end)
 
+    -- Первичное отображение списка
     ConfigManager.RefreshList()
 end
 
