@@ -10,7 +10,9 @@ Library.Theme = import("src/Theme.lua")
 Library.Draggable = import("src/Draggable.lua")
 Library.ConfigManager = import("src/ConfigManager.lua")
 
+-- Глобальный реестр флагов (состояний функций для конфигов)
 Library.Flags = {}
+Library.ActiveUI = nil
 
 function Library.new(title)
     local self = setmetatable({}, Library)
@@ -26,6 +28,9 @@ function Library.new(title)
     self.DefaultWidth = 190
     self.ColumnHeight = 420
 
+    -- Сохраняем экземпляр для доступа из регистратора модулей
+    Library.ActiveUI = self
+
     UserInputService.InputBegan:Connect(function(input, processed)
         if not processed and input.KeyCode == self.ToggleKey then
             self.ScreenGui.Enabled = not self.ScreenGui.Enabled
@@ -40,12 +45,6 @@ function Library:RegisterFlag(flagName, initialValue, setCallback)
         Value = initialValue,
         Set = setCallback
     }
-end
-
--- Метод для легкой регистрации модулей через экземпляр UI
-function Library:RegisterModule(relativePath)
-    local Register = import("register.lua")
-    Register.Module(self, relativePath)
 end
 
 function Library:ShowConfirm(title, message, onYes, onNo)
@@ -205,11 +204,10 @@ function Library:AddColumn(title, customWidth)
     return colObj
 end
 
--- Безопасный поиск колонки
 function Library:GetColumn(title)
-    if not self.Columns then return nil end
+    if not self or not self.Columns then return nil end
     for _, col in ipairs(self.Columns) do
-        if col.Title and col.Title:lower() == title:lower() then
+        if col.Title:lower() == title:lower() then
             return col
         end
     end

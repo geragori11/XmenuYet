@@ -1,19 +1,20 @@
 -- [File: example.lua]
 local Library = import("init.lua")
-local AddSlider = import("src/Elements/Slider.lua")
+local Register = import("register.lua")
+
 local AddDropdown = import("src/Elements/Dropdown.lua")
 
+-- 1. Сначала создаём объект UI
 local UI = Library.new("XClientMenu")
 
--- Создание стандартных вкладок
+-- 2. Создаём базовые колонки
 UI:AddColumn("Combat")
 UI:AddColumn("Movement")
 UI:AddColumn("Visual")
 
--- Создание расширенной колонки Configs (ширина 230px)
+-- 3. Создаём колонку Configs
 local configCol = UI:AddColumn("Configs", 230)
 
--- Настройки меню
 local keyNames = {"K", "RightControl", "Insert", "RightShift"}
 AddDropdown(configCol.Container, "Бинд меню", keyNames, function(selectedKey)
     if Enum.KeyCode[selectedKey] then
@@ -21,9 +22,7 @@ AddDropdown(configCol.Container, "Бинд меню", keyNames, function(selecte
     end
 end)
 
--- Рендер UI управления конфигами
 Library.ConfigManager.RenderUI(configCol.Container, UI)
 
--- ==================== РЕГИСТРАЦИЯ МОДУЛЕЙ ====================
--- Теперь вызывается через созданный объект UI:
-UI:RegisterModule("Combat/Killaura")
+-- 4. Теперь регистрируем модули!
+Register.newmodule("Combat/Killaura")

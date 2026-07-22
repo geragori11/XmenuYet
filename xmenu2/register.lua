@@ -1,8 +1,10 @@
 -- [File: register.lua]
 local Register = {}
 
-local AddSection = function(container, title)
-    local Library = import("init.lua")
+local Library = import("init.lua")
+local AddToggle = import("src/Elements/Toggle.lua")
+
+local function AddSection(container, title)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 0, 22)
     label.BackgroundColor3 = Library.Theme.SectionHeader
@@ -19,20 +21,24 @@ local AddSection = function(container, title)
     corner.Parent = label
 end
 
-local AddToggle = import("src/Elements/Toggle.lua")
-
--- Теперь функция принимает экземпляр UI (self)
-function Register.Module(uiInstance, relativePath)
+function Register.newmodule(relativePath)
     local mod = import("modules/" .. relativePath .. ".lua")
     if not mod then return end
 
-    -- Поиск или создание нужной колонки у текущего UI
-    local col = uiInstance:GetColumn(mod.Page)
-    if not col then
-        col = uiInstance:AddColumn(mod.Page)
+    -- Берём активный экземпляр UI
+    local activeUI = Library.ActiveUI
+    if not activeUI then
+        warn("[Register Error] Сначала нужно инициализировать UI через Library.new()")
+        return
     end
 
-    -- Создание подсекции (Misc, Sheriff, Murder и т.д.)
+    -- Поиск или создание нужной колонки в активном UI
+    local col = activeUI:GetColumn(mod.Page)
+    if not col then
+        col = activeUI:AddColumn(mod.Page)
+    end
+
+    -- Создание секции
     if mod.Section then
         local sectionExists = false
         for _, child in ipairs(col.Container:GetChildren()) do
@@ -46,7 +52,7 @@ function Register.Module(uiInstance, relativePath)
         end
     end
 
-    -- Создание кнопки функции
+    -- Создание элемента
     local flagName = mod.Flag or (mod.Page .. "_" .. mod.Name)
     local holder, settingsContainer = AddToggle(
         col.Container,
@@ -56,7 +62,6 @@ function Register.Module(uiInstance, relativePath)
         mod.OnToggle
     )
 
-    -- Добавление ПКМ-настроек
     if mod.Settings then
         mod.Settings(settingsContainer)
     end
