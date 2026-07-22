@@ -110,14 +110,12 @@ return function(container, text, defaultColor, callback, flagName)
 
         local screenGui = container:FindFirstAncestorOfClass("ScreenGui") or game:GetService("CoreGui")
 
-        -- Тёмная подложка-оверлей
-        local overlay = Instance.new("TextButton")
+        -- Тёмная подложка-оверлей (Frame вместо кнопки)
+        local overlay = Instance.new("Frame")
         overlay.Name = "ColorPickerOverlay"
         overlay.Size = UDim2.new(1, 0, 1, 0)
         overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         overlay.BackgroundTransparency = 0.5
-        overlay.Text = ""
-        overlay.AutoButtonColor = false
         overlay.ZIndex = 200
         overlay.Parent = screenGui
 
@@ -315,7 +313,7 @@ return function(container, text, defaultColor, callback, flagName)
             end
         end)
 
-        local inputEndedConn, inputChangedConn
+        local inputEndedConn, inputChangedConn, overlayClickConn
 
         inputEndedConn = UserInputService.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -337,12 +335,21 @@ return function(container, text, defaultColor, callback, flagName)
         local function closePopup()
             if inputEndedConn then inputEndedConn:Disconnect() end
             if inputChangedConn then inputChangedConn:Disconnect() end
+            if overlayClickConn then overlayClickConn:Disconnect() end
             overlay:Destroy()
             popupOpen = false
         end
 
+        -- Закрытие только при клике строго вне popup
+        overlayClickConn = overlay.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                if input.Target and not input.Target:IsDescendantOf(popup) and input.Target ~= popup then
+                    closePopup()
+                end
+            end
+        end)
+
         okBtn.MouseButton1Click:Connect(closePopup)
-        overlay.MouseButton1Click:Connect(closePopup)
 
         updateUI()
     end
