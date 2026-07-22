@@ -1,9 +1,14 @@
 -- [File: src/ConfigManager.lua]
 local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 local Theme = import("src/Theme.lua")
 
 local ConfigManager = {}
 ConfigManager.FolderPath = "xmenu2_configs"
+ConfigManager.ValidConfigs = {}     -- кеш валидных имён (без .json)
+ConfigManager.LastFileList = {}     -- для сравнения изменений
+ConfigManager.ScanTimer = 0
+ConfigManager.ScanInterval = 0.4    -- секунды
 
 -- ===== Вспомогательные функции =====
 function ConfigManager.EnsureFolder()
@@ -12,23 +17,53 @@ function ConfigManager.EnsureFolder()
     end
 end
 
--- Удаляет .json в конце (регистронезависимо)
 function ConfigManager.NormalizeConfigName(name)
     if not name or name == "" then return name end
     return name:gsub("%.json$", "", 1):gsub("%.JSON$", "", 1)
 end
 
--- Возвращает полный путь к файлу по имени конфига
 function ConfigManager.GetFilePath(configName)
     configName = ConfigManager.NormalizeConfigName(configName)
     if not configName or configName == "" then return nil end
     return ConfigManager.FolderPath .. "/" .. configName .. ".json"
 end
 
--- Проверяет существование конфига
 function ConfigManager.Exists(configName)
     local path = ConfigManager.GetFilePath(configName)
     return path and isfile(path)
+end
+
+-- Проверяет, является ли файл валидным JSON (читается и декодируется)
+function ConfigManager.IsValidConfigFile(filePath)
+    local success, data = pcall(function()
+        local raw = readfile(filePath)
+        return HttpService:JSONDecode(raw)
+    end)
+    return success and data ~= nil
+end
+
+-- Сканирует папку и возвращает список валидных имён (без расширения)
+function ConfigManager.ScanFolder()
+    ConfigManager.EnsureFolder()
+    local files = listfiles(ConfigManager.FolderPath)
+    local valid = {}
+    for _, filePath in ipairs(files) do
+        -- Проверяем расширение .json
+        if filePath:lower():match("%.json$") then
+            -- Проверяем валидность содержимого
+            if ConfigManager.IsValidConfigFile(filePath) then
+                local name = filePath:match("([^/\\]+)%.json$")
+                if name then
+                    table.insert(valid, name)
+                end
+            else
+                -- Если файл повреждён, пропускаем его (но не удаляем)
+                warn("[Config] ⚠️ Повреждённый файл (пропущен):", filePath)
+            end
+        end
+    end
+    table.sort(valid) -- для стабильного порядка
+    return valid
 end
 
 -- ===== Основные операции =====
@@ -50,6 +85,8 @@ function ConfigManager.Save(configName, libraryObj)
         local json = HttpService:JSONEncode(saveTable)
         writefile(path, json)
         print("[Config] ✅ Сохранён:", configName)
+        -- Принудительно обновляем список и кеш
+        ConfigManager.ValidConfigs = ConfigManager.ScanFolder()
         if ConfigManager.RefreshList then ConfigManager.RefreshList() end
     end
 
@@ -92,15 +129,12 @@ function ConfigManager.Delete(configName)
     if isfile(path) then
         delfile(path)
         print("[Config] 🗑️ Удалён:", configName)
+        -- Обновляем кеш и список
+        ConfigManager.ValidConfigs = ConfigManager.ScanFolder()
         if ConfigManager.RefreshList then ConfigManager.RefreshList() end
     else
         print("[Config] ❌ Файл не найден для удаления:", path)
     end
-end
-
-function ConfigManager.ListConfigs()
-    ConfigManager.EnsureFolder()
-    return listfiles(ConfigManager.FolderPath)
 end
 
 -- ===== Отрисовка UI =====
@@ -142,7 +176,7 @@ function ConfigManager.RenderUI(container, libraryObj)
     listLayout.Padding = UDim.new(0, 4)
     listLayout.Parent = listFrame
 
-    -- Функция обновления списка
+    -- Функция обновления списка (UI)
     ConfigManager.RefreshList = function()
         -- Удаляем все карточки, кроме UIListLayout
         for _, child in ipairs(listFrame:GetChildren()) do
@@ -151,8 +185,9 @@ function ConfigManager.RenderUI(container, libraryObj)
             end
         end
 
-        local files = ConfigManager.ListConfigs()
-        local fileCount = #files
+        -- Используем кеш валидных имён
+        local validNames = ConfigManager.ValidConfigs
+        local fileCount = #validNames
 
         if fileCount == 0 then
             listFrame.Size = UDim2.new(1, 0, 0, 24)
@@ -167,13 +202,7 @@ function ConfigManager.RenderUI(container, libraryObj)
         else
             listFrame.Size = UDim2.new(1, 0, 0, fileCount * 34)
 
-            for idx, filePath in ipairs(files) do
-                -- Надёжно извлекаем имя файла (последняя часть пути)
-                local fullFileName = filePath:match("([^/\\]+)$")
-                if not fullFileName then fullFileName = filePath end
-                -- Убираем расширение .json для отображения и операций
-                local displayName = fullFileName:gsub("%.json$", "", 1):gsub("%.JSON$", "", 1)
-
+            for idx, displayName in ipairs(validNames) do
                 local card = Instance.new("Frame")
                 card.Size = UDim2.new(1, 0, 0, 30)
                 card.BackgroundColor3 = Theme.ElementBackground
@@ -244,8 +273,48 @@ function ConfigManager.RenderUI(container, libraryObj)
         end
     end)
 
-    -- Первоначальная отрисовка списка
+    -- Первоначальное сканирование и отрисовка
+    ConfigManager.ValidConfigs = ConfigManager.ScanFolder()
     ConfigManager.RefreshList()
+
+    -- ===== Фоновое сканирование каждые 0.4 секунды =====
+    local heartbeatConnection
+    heartbeatConnection = RunService.Heartbeat:Connect(function(deltaTime)
+        ConfigManager.ScanTimer = ConfigManager.ScanTimer + deltaTime
+        if ConfigManager.ScanTimer >= ConfigManager.ScanInterval then
+            ConfigManager.ScanTimer = 0
+            -- Сканируем и сравниваем с текущим кешем
+            local newValid = ConfigManager.ScanFolder()
+            -- Проверяем, изменился ли список (по содержимому)
+            local changed = false
+            if #newValid ~= #ConfigManager.ValidConfigs then
+                changed = true
+            else
+                for i = 1, #newValid do
+                    if newValid[i] ~= ConfigManager.ValidConfigs[i] then
+                        changed = true
+                        break
+                    end
+                end
+            end
+            if changed then
+                ConfigManager.ValidConfigs = newValid
+                ConfigManager.RefreshList()
+                -- Небольшой лог для отладки (можно закомментировать)
+                -- print("[Config] 🔄 Список обновлён (фоновое сканирование)")
+            end
+        end
+    end)
+
+    -- При уничтожении UI отключаем сканирование (опционально)
+    container.AncestryChanged:Connect(function()
+        if not container:IsDescendantOf(game) then
+            if heartbeatConnection then
+                heartbeatConnection:Disconnect()
+                heartbeatConnection = nil
+            end
+        end
+    end)
 end
 
 return ConfigManager
