@@ -5,10 +5,32 @@ local Theme = import("src/Theme.lua")
 
 local ConfigManager = {}
 ConfigManager.FolderPath = "xmenu2_configs"
-ConfigManager.ValidConfigs = {}     -- кеш валидных имён (без .json)
-ConfigManager.LastFileList = {}     -- для сравнения изменений
+ConfigManager.ValidConfigs = {}
 ConfigManager.ScanTimer = 0
-ConfigManager.ScanInterval = 0.4    -- секунды
+ConfigManager.ScanInterval = 0.4
+
+-- ===== Сериализация / десериализация =====
+function ConfigManager.SerializeValue(val)
+    -- Проверка на Color3 (по наличию полей R, G, B)
+    if type(val) == "table" and val.R and val.G and val.B then
+        return {
+            __type = "Color3",
+            R = val.R,
+            G = val.G,
+            B = val.B
+        }
+    else
+        return val
+    end
+end
+
+function ConfigManager.DeserializeValue(val)
+    if type(val) == "table" and val.__type == "Color3" then
+        return Color3.new(val.R, val.G, val.B)
+    else
+        return val
+    end
+end
 
 -- ===== Вспомогательные функции =====
 function ConfigManager.EnsureFolder()
@@ -33,7 +55,6 @@ function ConfigManager.Exists(configName)
     return path and isfile(path)
 end
 
--- Проверяет, является ли файл валидным JSON (читается и декодируется)
 function ConfigManager.IsValidConfigFile(filePath)
     local success, data = pcall(function()
         local raw = readfile(filePath)
@@ -42,27 +63,23 @@ function ConfigManager.IsValidConfigFile(filePath)
     return success and data ~= nil
 end
 
--- Сканирует папку и возвращает список валидных имён (без расширения)
 function ConfigManager.ScanFolder()
     ConfigManager.EnsureFolder()
     local files = listfiles(ConfigManager.FolderPath)
     local valid = {}
     for _, filePath in ipairs(files) do
-        -- Проверяем расширение .json
         if filePath:lower():match("%.json$") then
-            -- Проверяем валидность содержимого
             if ConfigManager.IsValidConfigFile(filePath) then
                 local name = filePath:match("([^/\\]+)%.json$")
                 if name then
                     table.insert(valid, name)
                 end
             else
-                -- Если файл повреждён, пропускаем его (но не удаляем)
                 warn("[Config] ⚠️ Повреждённый файл (пропущен):", filePath)
             end
         end
     end
-    table.sort(valid) -- для стабильного порядка
+    table.sort(valid)
     return valid
 end
 
@@ -80,12 +97,11 @@ function ConfigManager.Save(configName, libraryObj)
     local function DoSave()
         local saveTable = {}
         for flagKey, flagData in pairs(libraryObj.Flags) do
-            saveTable[flagKey] = flagData.Value
+            saveTable[flagKey] = ConfigManager.SerializeValue(flagData.Value)
         end
         local json = HttpService:JSONEncode(saveTable)
         writefile(path, json)
         print("[Config] ✅ Сохранён:", configName)
-        -- Принудительно обновляем список и кеш
         ConfigManager.ValidConfigs = ConfigManager.ScanFolder()
         if ConfigManager.RefreshList then ConfigManager.RefreshList() end
     end
@@ -112,7 +128,8 @@ function ConfigManager.Load(configName, libraryObj)
         if data then
             for flagKey, storedVal in pairs(data) do
                 if libraryObj.Flags[flagKey] and libraryObj.Flags[flagKey].Set then
-                    libraryObj.Flags[flagKey].Set(storedVal)
+                    local value = ConfigManager.DeserializeValue(storedVal)
+                    libraryObj.Flags[flagKey].Set(value)
                 end
             end
             print("[Config] ✅ Загружен:", configName)
@@ -129,7 +146,6 @@ function ConfigManager.Delete(configName)
     if isfile(path) then
         delfile(path)
         print("[Config] 🗑️ Удалён:", configName)
-        -- Обновляем кеш и список
         ConfigManager.ValidConfigs = ConfigManager.ScanFolder()
         if ConfigManager.RefreshList then ConfigManager.RefreshList() end
     else
@@ -142,12 +158,10 @@ function ConfigManager.RenderUI(container, libraryObj)
     local AddTextInput = import("src/Elements/TextInput.lua")
     local currentConfigName = "default"
 
-    -- Поле ввода имени
     AddTextInput(container, "Имя конфига...", function(txt)
         currentConfigName = txt
     end)
 
-    -- Кнопка "Сохранить"
     local saveBtn = Instance.new("TextButton")
     saveBtn.Name = "SaveConfigButton"
     saveBtn.Size = UDim2.new(1, 0, 0, 26)
@@ -163,7 +177,6 @@ function ConfigManager.RenderUI(container, libraryObj)
     saveCorner.CornerRadius = Theme.ElementCorner
     saveCorner.Parent = saveBtn
 
-    -- Контейнер для списка конфигов
     local listFrame = Instance.new("Frame")
     listFrame.Name = "ConfigListHolder"
     listFrame.Size = UDim2.new(1, 0, 0, 24)
@@ -176,16 +189,13 @@ function ConfigManager.RenderUI(container, libraryObj)
     listLayout.Padding = UDim.new(0, 4)
     listLayout.Parent = listFrame
 
-    -- Функция обновления списка (UI)
     ConfigManager.RefreshList = function()
-        -- Удаляем все карточки, кроме UIListLayout
         for _, child in ipairs(listFrame:GetChildren()) do
             if not child:IsA("UIListLayout") then
                 child:Destroy()
             end
         end
 
-        -- Используем кеш валидных имён
         local validNames = ConfigManager.ValidConfigs
         local fileCount = #validNames
 
@@ -225,7 +235,6 @@ function ConfigManager.RenderUI(container, libraryObj)
                 nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
                 nameLabel.Parent = card
 
-                -- Кнопка "Загрузить"
                 local loadBtn = Instance.new("TextButton")
                 loadBtn.Size = UDim2.new(0.32, 0, 0.8, 0)
                 loadBtn.Position = UDim2.new(0.39, 0, 0.1, 0)
@@ -243,7 +252,6 @@ function ConfigManager.RenderUI(container, libraryObj)
                     ConfigManager.Load(displayName, libraryObj)
                 end)
 
-                -- Кнопка "Удалить"
                 local delBtn = Instance.new("TextButton")
                 delBtn.Size = UDim2.new(0.25, 0, 0.8, 0)
                 delBtn.Position = UDim2.new(0.72, 0, 0.1, 0)
@@ -264,7 +272,6 @@ function ConfigManager.RenderUI(container, libraryObj)
         end
     end
 
-    -- Обработчик сохранения
     saveBtn.MouseButton1Click:Connect(function()
         if currentConfigName and currentConfigName ~= "" then
             ConfigManager.Save(currentConfigName, libraryObj)
@@ -273,19 +280,15 @@ function ConfigManager.RenderUI(container, libraryObj)
         end
     end)
 
-    -- Первоначальное сканирование и отрисовка
     ConfigManager.ValidConfigs = ConfigManager.ScanFolder()
     ConfigManager.RefreshList()
 
-    -- ===== Фоновое сканирование каждые 0.4 секунды =====
     local heartbeatConnection
     heartbeatConnection = RunService.Heartbeat:Connect(function(deltaTime)
         ConfigManager.ScanTimer = ConfigManager.ScanTimer + deltaTime
         if ConfigManager.ScanTimer >= ConfigManager.ScanInterval then
             ConfigManager.ScanTimer = 0
-            -- Сканируем и сравниваем с текущим кешем
             local newValid = ConfigManager.ScanFolder()
-            -- Проверяем, изменился ли список (по содержимому)
             local changed = false
             if #newValid ~= #ConfigManager.ValidConfigs then
                 changed = true
@@ -300,13 +303,10 @@ function ConfigManager.RenderUI(container, libraryObj)
             if changed then
                 ConfigManager.ValidConfigs = newValid
                 ConfigManager.RefreshList()
-                -- Небольшой лог для отладки (можно закомментировать)
-                -- print("[Config] 🔄 Список обновлён (фоновое сканирование)")
             end
         end
     end)
 
-    -- При уничтожении UI отключаем сканирование (опционально)
     container.AncestryChanged:Connect(function()
         if not container:IsDescendantOf(game) then
             if heartbeatConnection then

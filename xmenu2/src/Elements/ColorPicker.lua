@@ -1,6 +1,7 @@
+-- [File: src/Elements/ColorPicker.lua]
 local Theme = import("src/Theme.lua")
 
-return function(container, text, defaultColor, callback)
+return function(container, text, defaultColor, callback, flagName)
     local currentColor = defaultColor or Color3.fromRGB(255, 255, 255)
 
     local frame = Instance.new("Frame")
@@ -24,9 +25,30 @@ return function(container, text, defaultColor, callback)
     colorPreview.Text = ""
     colorPreview.Parent = frame
 
+    local function setColor(color)
+        currentColor = color
+        colorPreview.BackgroundColor3 = color
+        if callback then callback(color) end
+        if flagName then
+            local Lib = import("init.lua")
+            if Lib.Flags[flagName] then
+                Lib.Flags[flagName].Value = color
+            end
+        end
+    end
+
     colorPreview.MouseButton1Click:Connect(function()
-        currentColor = Color3.fromHSV(math.random(), 1, 1)
-        colorPreview.BackgroundColor3 = currentColor
-        if callback then callback(currentColor) end
+        local newColor = Color3.fromHSV(math.random(), 1, 1)
+        setColor(newColor)
     end)
+
+    -- Регистрация флага
+    if flagName then
+        local Lib = import("init.lua")
+        Lib:RegisterFlag(flagName, currentColor, function(val)
+            setColor(val)
+        end)
+    end
+
+    return frame
 end

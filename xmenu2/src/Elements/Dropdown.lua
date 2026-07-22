@@ -1,13 +1,14 @@
 -- [File: src/Elements/Dropdown.lua]
 local Theme = import("src/Theme.lua")
 
-return function(container, text, options, callback)
+return function(container, text, options, callback, flagName, defaultOption)
+    local selected = defaultOption or options[1] or ""
     local expanded = false
 
     local mainBtn = Instance.new("TextButton")
     mainBtn.Size = UDim2.new(1, 0, 0, 26)
     mainBtn.BackgroundColor3 = Theme.ElementBackground
-    mainBtn.Text = "  " .. text .. " ▼"
+    mainBtn.Text = "  " .. text .. " (" .. selected .. ")"
     mainBtn.TextColor3 = Theme.TextColor
     mainBtn.Font = Enum.Font.SourceSans
     mainBtn.TextSize = 13
@@ -33,6 +34,18 @@ return function(container, text, options, callback)
     local layout = Instance.new("UIListLayout")
     layout.Parent = listHolder
 
+    local function setSelected(opt)
+        selected = opt
+        mainBtn.Text = "  " .. text .. " (" .. opt .. ")"
+        if callback then callback(opt) end
+        if flagName then
+            local Lib = import("init.lua")
+            if Lib.Flags[flagName] then
+                Lib.Flags[flagName].Value = opt
+            end
+        end
+    end
+
     for _, opt in ipairs(options) do
         local itemBtn = Instance.new("TextButton")
         itemBtn.Size = UDim2.new(1, 0, 0, 20)
@@ -44,10 +57,9 @@ return function(container, text, options, callback)
         itemBtn.Parent = listHolder
 
         itemBtn.MouseButton1Click:Connect(function()
-            mainBtn.Text = "  " .. text .. " (" .. opt .. ")"
+            setSelected(opt)
             expanded = false
             listHolder.Visible = false
-            if callback then callback(opt) end
         end)
     end
 
@@ -56,6 +68,14 @@ return function(container, text, options, callback)
         listHolder.Visible = expanded
         listHolder.Size = UDim2.new(1, 0, 0, #options * 20)
     end)
+
+    -- Регистрация флага
+    if flagName then
+        local Lib = import("init.lua")
+        Lib:RegisterFlag(flagName, selected, function(val)
+            setSelected(val)
+        end)
+    end
 
     return mainBtn
 end

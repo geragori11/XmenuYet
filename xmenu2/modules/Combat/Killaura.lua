@@ -8,19 +8,33 @@ return {
     Name = "Killaura",
     Default = false,
 
-    -- Логика включения/выключения функции
     OnToggle = function(state)
         print("[Killaura] Состояние:", state)
     end,
 
-    -- Настройки, открываемые при нажатии Правой Кнопкой Мыши (ПКМ) по функции
     Settings = function(container)
-        AddSlider(container, "Радиус атаки", 5, 50, 15, function(v)
-            print("[Killaura] Радиус:", v)
-        end)
+        -- Уникальный флаг для радиуса
+        AddSlider(
+            container,
+            "Радиус атаки",          -- текст
+            5,                       -- минимум
+            50,                      -- максимум
+            15,                      -- значение по умолчанию
+            function(v)              -- callback при изменении (опционально)
+                print("[Killaura] Радиус:", v)
+            end,
+            "Killaura_Radius"        -- <-- flagName (обязательно для сохранения!)
+        )
 
-        AddColorPicker(container, "Цвет таргета", Color3.fromRGB(255, 0, 0), function(c)
-            print("[Killaura] Цвет:", c)
-        end)
+        -- Уникальный флаг для цвета
+        AddColorPicker(
+            container,
+            "Цвет таргета",                              -- текст
+            Color3.fromRGB(255, 0, 0),                  -- цвет по умолчанию
+            function(c)                                 -- callback (опционально)
+                print("[Killaura] Цвет:", c)
+            end,
+            "Killaura_TargetColor"                      -- <-- flagName
+        )
     end
 }

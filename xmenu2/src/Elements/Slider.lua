@@ -2,7 +2,7 @@
 local UserInputService = game:GetService("UserInputService")
 local Theme = import("src/Theme.lua")
 
-return function(container, text, min, max, default, callback)
+return function(container, text, min, max, default, callback, flagName)
     local value = default or min
 
     local frame = Instance.new("Frame")
@@ -45,14 +45,25 @@ return function(container, text, min, max, default, callback)
     fillCorner.CornerRadius = UDim.new(1, 0)
     fillCorner.Parent = fill
 
+    local function setValue(newVal)
+        value = newVal
+        fill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
+        label.Text = text .. ": " .. tostring(value)
+        if callback then callback(value) end
+        if flagName then
+            local Lib = import("init.lua")
+            if Lib.Flags[flagName] then
+                Lib.Flags[flagName].Value = value
+            end
+        end
+    end
+
     local dragging = false
     local function update(input)
         local posX = math.clamp(input.Position.X - track.AbsolutePosition.X, 0, track.AbsoluteSize.X)
         local pct = posX / track.AbsoluteSize.X
-        value = math.floor(min + (max - min) * pct)
-        fill.Size = UDim2.new(pct, 0, 1, 0)
-        label.Text = text .. ": " .. tostring(value)
-        if callback then callback(value) end
+        local newVal = math.floor(min + (max - min) * pct)
+        setValue(newVal)
     end
 
     track.InputBegan:Connect(function(input)
@@ -73,6 +84,14 @@ return function(container, text, min, max, default, callback)
             update(input)
         end
     end)
+
+    -- Регистрация флага
+    if flagName then
+        local Lib = import("init.lua")
+        Lib:RegisterFlag(flagName, value, function(val)
+            setValue(val)
+        end)
+    end
 
     return frame
 end
