@@ -2,6 +2,7 @@
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Theme = import("src/Theme.lua")
+local Library = import("init.lua")   -- <-- добавлен импорт
 
 local ConfigManager = {}
 ConfigManager.FolderPath = "xmenu2_configs"
@@ -11,7 +12,6 @@ ConfigManager.ScanInterval = 0.4
 
 -- ===== Сериализация / десериализация =====
 function ConfigManager.SerializeValue(val)
-    -- Проверка на Color3 (по наличию полей R, G, B)
     if type(val) == "table" and val.R and val.G and val.B then
         return {
             __type = "Color3",
@@ -96,7 +96,8 @@ function ConfigManager.Save(configName, libraryObj)
 
     local function DoSave()
         local saveTable = {}
-        for flagKey, flagData in pairs(libraryObj.Flags) do
+        -- Используем глобальный реестр Library.Flags
+        for flagKey, flagData in pairs(Library.Flags) do
             saveTable[flagKey] = ConfigManager.SerializeValue(flagData.Value)
         end
         local json = HttpService:JSONEncode(saveTable)
@@ -127,9 +128,9 @@ function ConfigManager.Load(configName, libraryObj)
         local data = HttpService:JSONDecode(raw)
         if data then
             for flagKey, storedVal in pairs(data) do
-                if libraryObj.Flags[flagKey] and libraryObj.Flags[flagKey].Set then
+                if Library.Flags[flagKey] and Library.Flags[flagKey].Set then
                     local value = ConfigManager.DeserializeValue(storedVal)
-                    libraryObj.Flags[flagKey].Set(value)
+                    Library.Flags[flagKey].Set(value)
                 end
             end
             print("[Config] ✅ Загружен:", configName)

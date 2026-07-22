@@ -32,7 +32,6 @@ return function(container, text, default, flagName, callback)
     corner.CornerRadius = Theme.ElementCorner
     corner.Parent = button
 
-    -- Контейнер настроек функции (появляется при ПКМ)
     local optionsFrame = Instance.new("Frame")
     optionsFrame.Name = "OptionsFrame"
     optionsFrame.Size = UDim2.new(1, 0, 0, 0)
@@ -62,8 +61,6 @@ return function(container, text, default, flagName, callback)
         state = newVal
         button.TextColor3 = state and Theme.AccentColor or Theme.TextColor
         if callback then callback(state) end
-
-        -- ОБНОВЛЕНИЕ ГЛОБАЛЬНОГО ФЛАГА
         if flagName then
             local Lib = import("init.lua")
             if Lib.Flags and Lib.Flags[flagName] then
@@ -72,17 +69,14 @@ return function(container, text, default, flagName, callback)
         end
     end
 
-    -- Включение/выключение по ЛКМ
     button.MouseButton1Click:Connect(function()
         setState(not state)
     end)
 
-    -- Открытие/закрытие настроек по ПКМ
     button.MouseButton2Click:Connect(function()
         optionsFrame.Visible = not optionsFrame.Visible
     end)
 
-    -- Регистрация флага в ядре
     if flagName then
         local Lib = import("init.lua")
         Lib:RegisterFlag(flagName, state, function(val)
@@ -90,5 +84,8 @@ return function(container, text, default, flagName, callback)
         end)
     end
 
-    return holder, optionsFrame
+    return {
+        main = holder,
+        settings = optionsFrame
+    }
 end
