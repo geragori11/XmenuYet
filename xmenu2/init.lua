@@ -24,7 +24,6 @@ function Library.new(title)
     self.ColumnWidth = 180
     self.ColumnHeight = 400
 
-    -- Глобальный обработчик бинда открытия/закрытия
     UserInputService.InputBegan:Connect(function(input, processed)
         if not processed and input.KeyCode == self.ToggleKey then
             self.ScreenGui.Enabled = not self.ScreenGui.Enabled
@@ -34,7 +33,6 @@ function Library.new(title)
     return self
 end
 
--- Расчет процента пересечения (наложения) двух коробок
 local function calculateOverlapRatio(frameA, frameB)
     local posA, sizeA = frameA.AbsolutePosition, frameA.AbsoluteSize
     local posB, sizeB = frameB.AbsolutePosition, frameB.AbsoluteSize
@@ -107,12 +105,15 @@ function Library:AddColumn(title)
     headerText.TextSize = 14
     headerText.Parent = header
 
+    -- ScrollingFrame с авто-расчетом размера контента
     local container = Instance.new("ScrollingFrame")
     container.Name = "Container"
     container.Size = UDim2.new(1, -8, 1, -40)
     container.Position = UDim2.new(0, 4, 0, 36)
     container.BackgroundTransparency = 1
-    container.ScrollBarThickness = 2
+    container.ScrollBarThickness = 3
+    container.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    container.CanvasSize = UDim2.new(0, 0, 0, 0)
     container.Parent = columnFrame
 
     local listLayout = Instance.new("UIListLayout")
@@ -122,7 +123,7 @@ function Library:AddColumn(title)
 
     local padding = Instance.new("UIPadding")
     padding.PaddingTop = UDim.new(0, 2)
-    padding.PaddingBottom = UDim.new(0, 2)
+    padding.PaddingBottom = UDim.new(0, 4)
     padding.Parent = container
 
     local colObj = {
@@ -132,7 +133,6 @@ function Library:AddColumn(title)
         Library = self
     }
 
-    -- Логика отслеживания завершения перетаскивания и защиты от наложения
     Library.Draggable.Enable(columnFrame, header, function(draggedFrame)
         local isOverlapping = false
 
@@ -149,7 +149,6 @@ function Library:AddColumn(title)
         local targetPos = colObj.LastValidPos
 
         if isOverlapping then
-            -- Проверяем, свободна ли старая позиция
             local lastPosOccupied = false
             for _, col in ipairs(self.Columns) do
                 if col.Frame ~= draggedFrame then
@@ -166,7 +165,6 @@ function Library:AddColumn(title)
                 targetPos = self:FindFreePosition(colObj)
             end
 
-            -- Возвращаем плавной анимацией
             TweenService:Create(draggedFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
                 Position = targetPos
             }):Play()

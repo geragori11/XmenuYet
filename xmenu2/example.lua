@@ -4,7 +4,6 @@ local AddToggle = import("src/Elements/Toggle.lua")
 local AddSlider = import("src/Elements/Slider.lua")
 local AddDropdown = import("src/Elements/Dropdown.lua")
 local AddColorPicker = import("src/Elements/ColorPicker.lua")
-local AddTextInput = import("src/Elements/TextInput.lua")
 
 local UI = Library.new("XClientMenu")
 
@@ -56,7 +55,7 @@ local configCol = UI:AddColumn("Configs")
 AddSection(configCol.Container, "Menu Settings")
 
 -- Изменение бинда меню
-local keyNames = {"RightControl", "Insert", "RightShift", "Unknown"}
+local keyNames = {"RightControl", "Insert", "RightShift"}
 AddDropdown(configCol.Container, "Menu Keybind", keyNames, function(selectedKey)
     if Enum.KeyCode[selectedKey] then
         UI.ToggleKey = Enum.KeyCode[selectedKey]
@@ -73,62 +72,20 @@ AddSlider(configCol.Container, "Height", 300, 600, 400, function(h)
     UI:SetColumnSize(UI.ColumnWidth, h)
 end)
 
-AddSection(configCol.Container, "Config Management")
+AddSection(configCol.Container, "Config Manager")
 
-local currentConfigInput = "default"
-AddTextInput(configCol.Container, "Имя конфига...", function(txt)
-    currentConfigInput = txt
-end)
-
--- Контейнер для отображения сохраненных файлов конфигов
-local configListFrame = Instance.new("Frame")
-configListFrame.Size = UDim2.new(1, 0, 0, 0)
-configListFrame.BackgroundTransparency = 1
-configListFrame.Parent = configCol.Container
-
-local listLayout = Instance.new("UIListLayout")
-listLayout.Padding = UDim.new(0, 4)
-listLayout.Parent = configListFrame
-
--- Функция обновления динамического списка конфигов в UI
-local function RefreshConfigsUI()
-    for _, child in ipairs(configListFrame:GetChildren()) do
-        if not child:IsA("UIListLayout") then
-            child:Destroy()
-        end
+-- ПОЛНАЯ ИНИЦИАЛИЗА ЯДРА КОНФИГОВ В ОДНУ СТРОКУ:
+Library.ConfigManager.RenderUI(
+    configCol.Container,
+    -- Функция сбора данных для сохранения:
+    function()
+        return {
+            Speed = 16,
+            Key = tostring(UI.ToggleKey)
+        }
+    end,
+    -- Функция применения загруженного конфига:
+    function(configName, data)
+        print("Конфиг успешно загружен (" .. configName .. "):", data)
     end
-
-    local files = Library.ConfigManager.ListConfigs()
-    for _, filePath in ipairs(files) do
-        local fileName = string.match(filePath, "([^/]+)%.json$") or filePath
-
-        local cfgBtn = Instance.new("TextButton")
-        cfgBtn.Size = UDim2.new(1, 0, 0, 24)
-        cfgBtn.BackgroundColor3 = Color3.fromRGB(38, 38, 48)
-        cfgBtn.Text = " 📄 " .. fileName
-        cfgBtn.TextColor3 = Library.Theme.TextColor
-        cfgBtn.Font = Enum.Font.SourceSans
-        cfgBtn.TextSize = 12
-        cfgBtn.TextXAlignment = Enum.TextXAlignment.Left
-        cfgBtn.Parent = configListFrame
-
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = Library.Theme.ElementCorner
-        corner.Parent = cfgBtn
-
-        cfgBtn.MouseButton1Click:Connect(function()
-            local data = Library.ConfigManager.Load(fileName)
-            print("Конфиг " .. fileName .. " загружен:", data)
-        end)
-    end
-end
-
-AddToggle(configCol.Container, "Сохранить конфиг", false, function()
-    if currentConfigInput ~= "" then
-        Library.ConfigManager.Save(currentConfigInput, { Speed = 16, Key = tostring(UI.ToggleKey) })
-        RefreshConfigsUI()
-    end
-end)
-
--- Первоначальная загрузка списка конфигов
-RefreshConfigsUI()
+)
