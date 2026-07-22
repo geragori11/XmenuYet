@@ -1,8 +1,8 @@
 -- [File: register.lua]
 local Register = {}
 
-local Library = import("init.lua")
 local AddSection = function(container, title)
+    local Library = import("init.lua")
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 0, 22)
     label.BackgroundColor3 = Library.Theme.SectionHeader
@@ -21,17 +21,18 @@ end
 
 local AddToggle = import("src/Elements/Toggle.lua")
 
-function Register.newmodule(relativePath)
+-- Теперь функция принимает экземпляр UI (self)
+function Register.Module(uiInstance, relativePath)
     local mod = import("modules/" .. relativePath .. ".lua")
     if not mod then return end
 
-    -- Поиск или создание нужной колонки
-    local col = Library:GetColumn(mod.Page)
+    -- Поиск или создание нужной колонки у текущего UI
+    local col = uiInstance:GetColumn(mod.Page)
     if not col then
-        col = Library:AddColumn(mod.Page)
+        col = uiInstance:AddColumn(mod.Page)
     end
 
-    -- Создание подсекции (Misc, Sheriff, Murder и т.д.), если указана
+    -- Создание подсекции (Misc, Sheriff, Murder и т.д.)
     if mod.Section then
         local sectionExists = false
         for _, child in ipairs(col.Container:GetChildren()) do
@@ -45,7 +46,7 @@ function Register.newmodule(relativePath)
         end
     end
 
-    -- Создание кнопки функции с поддержкой ПКМ
+    -- Создание кнопки функции
     local flagName = mod.Flag or (mod.Page .. "_" .. mod.Name)
     local holder, settingsContainer = AddToggle(
         col.Container,
@@ -55,7 +56,7 @@ function Register.newmodule(relativePath)
         mod.OnToggle
     )
 
-    -- Заполнение настроек, вызываемых по ПКМ
+    -- Добавление ПКМ-настроек
     if mod.Settings then
         mod.Settings(settingsContainer)
     end

@@ -10,7 +10,6 @@ Library.Theme = import("src/Theme.lua")
 Library.Draggable = import("src/Draggable.lua")
 Library.ConfigManager = import("src/ConfigManager.lua")
 
--- Глобальный реестр флагов (состояний функций для конфигов)
 Library.Flags = {}
 
 function Library.new(title)
@@ -36,7 +35,6 @@ function Library.new(title)
     return self
 end
 
--- Регистрация и управление флагами
 function Library:RegisterFlag(flagName, initialValue, setCallback)
     Library.Flags[flagName] = {
         Value = initialValue,
@@ -44,7 +42,12 @@ function Library:RegisterFlag(flagName, initialValue, setCallback)
     }
 end
 
--- Всплывающее модальное окно подтверждения ("Да" / "Нет")
+-- Метод для легкой регистрации модулей через экземпляр UI
+function Library:RegisterModule(relativePath)
+    local Register = import("register.lua")
+    Register.Module(self, relativePath)
+end
+
 function Library:ShowConfirm(title, message, onYes, onNo)
     local overlay = Instance.new("Frame")
     overlay.Name = "ConfirmOverlay"
@@ -88,7 +91,6 @@ function Library:ShowConfirm(title, message, onYes, onNo)
     descLbl.ZIndex = 102
     descLbl.Parent = modal
 
-    -- Кнопка ДА
     local yesBtn = Instance.new("TextButton")
     yesBtn.Size = UDim2.new(0.43, 0, 0, 28)
     yesBtn.Position = UDim2.new(0.05, 0, 1, -36)
@@ -104,7 +106,6 @@ function Library:ShowConfirm(title, message, onYes, onNo)
     yesCorner.CornerRadius = Library.Theme.ElementCorner
     yesCorner.Parent = yesBtn
 
-    -- Кнопка НЕТ
     local noBtn = Instance.new("TextButton")
     noBtn.Size = UDim2.new(0.43, 0, 0, 28)
     noBtn.Position = UDim2.new(0.52, 0, 1, -36)
@@ -197,8 +198,6 @@ function Library:AddColumn(title, customWidth)
     }
 
     Library.Draggable.Enable(columnFrame, header, function(draggedFrame)
-        -- Логика защиты от наложения
-        local targetPos = colObj.LastValidPos
         colObj.LastValidPos = draggedFrame.Position
     end)
 
@@ -206,9 +205,11 @@ function Library:AddColumn(title, customWidth)
     return colObj
 end
 
+-- Безопасный поиск колонки
 function Library:GetColumn(title)
+    if not self.Columns then return nil end
     for _, col in ipairs(self.Columns) do
-        if col.Title:lower() == title:lower() then
+        if col.Title and col.Title:lower() == title:lower() then
             return col
         end
     end

@@ -1,7 +1,5 @@
 -- [File: example.lua]
 local Library = import("init.lua")
-local Register = import("register.lua")
-
 local AddSlider = import("src/Elements/Slider.lua")
 local AddDropdown = import("src/Elements/Dropdown.lua")
 
@@ -27,5 +25,5 @@ end)
 Library.ConfigManager.RenderUI(configCol.Container, UI)
 
 -- ==================== РЕГИСТРАЦИЯ МОДУЛЕЙ ====================
--- Указываем имя файла из папки modules/
-Register.newmodule("Combat/Killaura")
+-- Теперь вызывается через созданный объект UI:
+UI:RegisterModule("Combat/Killaura")
