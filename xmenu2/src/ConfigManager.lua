@@ -11,19 +11,49 @@ function ConfigManager.EnsureFolder()
     end
 end
 
-function ConfigManager.Save(configName, data)
+function ConfigManager.Save(configName, libraryObj)
     ConfigManager.EnsureFolder()
-    local json = HttpService:JSONEncode(data)
-    writefile(ConfigManager.FolderPath .. "/" .. configName .. ".json", json)
+    local path = ConfigManager.FolderPath .. "/" .. configName .. ".json"
+
+    local function DoSave()
+        local saveTable = {}
+        for flagKey, flagData in pairs(libraryObj.Flags) do
+            saveTable[flagKey] = flagData.Value
+        end
+        local json = HttpService:JSONEncode(saveTable)
+        writefile(path, json)
+        print("[Config] Успешно сохранён:", configName)
+        if ConfigManager.RefreshList then ConfigManager.RefreshList() end
+    end
+
+    -- Проверка на существование файла для вызова подтверждения
+    if isfile(path) then
+        libraryObj:ShowConfirm(
+            "Перезапись конфига",
+            "Вы точно хотите сохранить изменения в уже существующий конфиг '" .. configName .. "'?",
+            function() DoSave() end,
+            function() print("[Config] Сохранение отменено пользователем") end
+        )
+    else
+        DoSave()
+    end
 end
 
-function ConfigManager.Load(configName)
+function ConfigManager.Load(configName, libraryObj)
     local path = ConfigManager.FolderPath .. "/" .. configName .. ".json"
     if isfile(path) then
         local raw = readfile(path)
-        return HttpService:JSONDecode(raw)
+        local data = HttpService:JSONDecode(raw)
+
+        if data then
+            for flagKey, storedVal in pairs(data) do
+                if libraryObj.Flags[flagKey] and libraryObj.Flags[flagKey].Set then
+                    libraryObj.Flags[flagKey].Set(storedVal)
+                end
+            end
+            print("[Config] Успешно загружен:", configName)
+        end
     end
-    return nil
 end
 
 function ConfigManager.Delete(configName)
@@ -38,17 +68,14 @@ function ConfigManager.ListConfigs()
     return listfiles(ConfigManager.FolderPath)
 end
 
-function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallback)
+function ConfigManager.RenderUI(container, libraryObj)
     local AddTextInput = import("src/Elements/TextInput.lua")
-
     local currentConfigName = "default"
 
-    -- 1. Поле ввода имени конфига
     AddTextInput(container, "Имя конфига...", function(txt)
         currentConfigName = txt
     end)
 
-    -- 2. Кнопка "Сохранить конфиг"
     local saveBtn = Instance.new("TextButton")
     saveBtn.Name = "SaveConfigButton"
     saveBtn.Size = UDim2.new(1, 0, 0, 26)
@@ -64,7 +91,6 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
     saveCorner.CornerRadius = Theme.ElementCorner
     saveCorner.Parent = saveBtn
 
-    -- 3. Контейнер списка карточек
     local listFrame = Instance.new("Frame")
     listFrame.Name = "ConfigListHolder"
     listFrame.Size = UDim2.new(1, 0, 0, 24)
@@ -77,12 +103,9 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
     listLayout.Padding = UDim.new(0, 4)
     listLayout.Parent = listFrame
 
-    -- Функция обновления списка карточек
     ConfigManager.RefreshList = function()
         for _, child in ipairs(listFrame:GetChildren()) do
-            if not child:IsA("UIListLayout") then
-                child:Destroy()
-            end
+            if not child:IsA("UIListLayout") then child:Destroy() end
         end
 
         local files = ConfigManager.ListConfigs()
@@ -104,7 +127,6 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
                 local fileName = string.match(filePath, "([^/]+)%.json$") or filePath
 
                 local card = Instance.new("Frame")
-                card.Name = "Card_" .. fileName
                 card.Size = UDim2.new(1, 0, 0, 30)
                 card.BackgroundColor3 = Theme.ElementBackground
                 card.LayoutOrder = idx
@@ -114,9 +136,8 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
                 cardCorner.CornerRadius = Theme.ElementCorner
                 cardCorner.Parent = card
 
-                -- Имя файла
                 local nameLabel = Instance.new("TextLabel")
-                nameLabel.Size = UDim2.new(0.35, -4, 1, 0)
+                nameLabel.Size = UDim2.new(0.38, -4, 1, 0)
                 nameLabel.Position = UDim2.new(0, 4, 0, 0)
                 nameLabel.BackgroundTransparency = 1
                 nameLabel.Text = "📄 " .. fileName
@@ -129,8 +150,8 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
 
                 -- Кнопка "Загрузить"
                 local loadBtn = Instance.new("TextButton")
-                loadBtn.Size = UDim2.new(0.35, 0, 0.8, 0)
-                loadBtn.Position = UDim2.new(0.36, 0, 0.1, 0)
+                loadBtn.Size = UDim2.new(0.32, 0, 0.8, 0)
+                loadBtn.Position = UDim2.new(0.39, 0, 0.1, 0)
                 loadBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 70)
                 loadBtn.Text = "Загрузить"
                 loadBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -143,16 +164,13 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
                 loadCorner.Parent = loadBtn
 
                 loadBtn.MouseButton1Click:Connect(function()
-                    local data = ConfigManager.Load(fileName)
-                    if data and onLoadDataCallback then
-                        onLoadDataCallback(fileName, data)
-                    end
+                    ConfigManager.Load(fileName, libraryObj)
                 end)
 
                 -- Кнопка "Удалить"
                 local delBtn = Instance.new("TextButton")
                 delBtn.Size = UDim2.new(0.25, 0, 0.8, 0)
-                delBtn.Position = UDim2.new(0.73, 0, 0.1, 0)
+                delBtn.Position = UDim2.new(0.72, 0, 0.1, 0)
                 delBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
                 delBtn.Text = "Удалить"
                 delBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -174,9 +192,7 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
 
     saveBtn.MouseButton1Click:Connect(function()
         if currentConfigName and currentConfigName ~= "" then
-            local dataToSave = getSaveDataCallback and getSaveDataCallback() or {}
-            ConfigManager.Save(currentConfigName, dataToSave)
-            ConfigManager.RefreshList()
+            ConfigManager.Save(currentConfigName, libraryObj)
         end
     end)
 

@@ -10,6 +10,9 @@ Library.Theme = import("src/Theme.lua")
 Library.Draggable = import("src/Draggable.lua")
 Library.ConfigManager = import("src/ConfigManager.lua")
 
+-- Глобальный реестр флагов (состояний функций для конфигов)
+Library.Flags = {}
+
 function Library.new(title)
     local self = setmetatable({}, Library)
 
@@ -20,11 +23,9 @@ function Library.new(title)
 
     self.ScreenGui = screenGui
     self.Columns = {}
-
-    -- БИНД ПО УМОЛЧАНИЮ: Клавиша K
     self.ToggleKey = Enum.KeyCode.K
-    self.ColumnWidth = 180
-    self.ColumnHeight = 400
+    self.DefaultWidth = 190
+    self.ColumnHeight = 420
 
     UserInputService.InputBegan:Connect(function(input, processed)
         if not processed and input.KeyCode == self.ToggleKey then
@@ -35,49 +36,109 @@ function Library.new(title)
     return self
 end
 
-local function calculateOverlapRatio(frameA, frameB)
-    local posA, sizeA = frameA.AbsolutePosition, frameA.AbsoluteSize
-    local posB, sizeB = frameB.AbsolutePosition, frameB.AbsoluteSize
-
-    local xOverlap = math.max(0, math.min(posA.X + sizeA.X, posB.X + sizeB.X) - math.max(posA.X, posB.X))
-    local yOverlap = math.max(0, math.min(posA.Y + sizeA.Y, posB.Y + sizeB.Y) - math.max(posA.Y, posB.Y))
-
-    local overlapArea = xOverlap * yOverlap
-    local areaA = sizeA.X * sizeA.Y
-
-    if areaA == 0 then return 0 end
-    return overlapArea / areaA
+-- Регистрация и управление флагами
+function Library:RegisterFlag(flagName, initialValue, setCallback)
+    Library.Flags[flagName] = {
+        Value = initialValue,
+        Set = setCallback
+    }
 end
 
-function Library:FindFreePosition(column)
-    for index = 0, 10 do
-        local testPos = UDim2.new(0, 20 + index * (self.ColumnWidth + 10), 0, 50)
-        local isOccupied = false
+-- Всплывающее модальное окно подтверждения ("Да" / "Нет")
+function Library:ShowConfirm(title, message, onYes, onNo)
+    local overlay = Instance.new("Frame")
+    overlay.Name = "ConfirmOverlay"
+    overlay.Size = UDim2.new(1, 0, 1, 0)
+    overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    overlay.BackgroundTransparency = 0.5
+    overlay.ZIndex = 100
+    overlay.Parent = self.ScreenGui
 
-        for _, col in ipairs(self.Columns) do
-            if col.Frame ~= column.Frame then
-                local dist = (Vector2.new(col.Frame.Position.X.Offset, col.Frame.Position.Y.Offset) -
-                              Vector2.new(testPos.X.Offset, testPos.Y.Offset)).Magnitude
-                if dist < (self.ColumnWidth * 0.8) then
-                    isOccupied = true
-                    break
-                end
-            end
-        end
+    local modal = Instance.new("Frame")
+    modal.Size = UDim2.new(0, 260, 0, 130)
+    modal.Position = UDim2.new(0.5, -130, 0.5, -65)
+    modal.BackgroundColor3 = Library.Theme.ColumnBackground
+    modal.ZIndex = 101
+    modal.Parent = overlay
 
-        if not isOccupied then
-            return testPos
-        end
-    end
-    return UDim2.new(0, 20, 0, 50)
+    local modalCorner = Instance.new("UICorner")
+    modalCorner.CornerRadius = Library.Theme.ColumnCorner
+    modalCorner.Parent = modal
+
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size = UDim2.new(1, -16, 0, 25)
+    titleLbl.Position = UDim2.new(0, 8, 0, 8)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text = title
+    titleLbl.TextColor3 = Library.Theme.TextColor
+    titleLbl.Font = Enum.Font.SourceSansBold
+    titleLbl.TextSize = 13
+    titleLbl.ZIndex = 102
+    titleLbl.Parent = modal
+
+    local descLbl = Instance.new("TextLabel")
+    descLbl.Size = UDim2.new(1, -16, 0, 40)
+    descLbl.Position = UDim2.new(0, 8, 0, 35)
+    descLbl.BackgroundTransparency = 1
+    descLbl.Text = message
+    descLbl.TextColor3 = Library.Theme.SubTextColor
+    descLbl.Font = Enum.Font.SourceSans
+    descLbl.TextSize = 11
+    descLbl.TextWrapped = true
+    descLbl.ZIndex = 102
+    descLbl.Parent = modal
+
+    -- Кнопка ДА
+    local yesBtn = Instance.new("TextButton")
+    yesBtn.Size = UDim2.new(0.43, 0, 0, 28)
+    yesBtn.Position = UDim2.new(0.05, 0, 1, -36)
+    yesBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 70)
+    yesBtn.Text = "Да"
+    yesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    yesBtn.Font = Enum.Font.SourceSansBold
+    yesBtn.TextSize = 12
+    yesBtn.ZIndex = 102
+    yesBtn.Parent = modal
+
+    local yesCorner = Instance.new("UICorner")
+    yesCorner.CornerRadius = Library.Theme.ElementCorner
+    yesCorner.Parent = yesBtn
+
+    -- Кнопка НЕТ
+    local noBtn = Instance.new("TextButton")
+    noBtn.Size = UDim2.new(0.43, 0, 0, 28)
+    noBtn.Position = UDim2.new(0.52, 0, 1, -36)
+    noBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    noBtn.Text = "Нет"
+    noBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    noBtn.Font = Enum.Font.SourceSansBold
+    noBtn.TextSize = 12
+    noBtn.ZIndex = 102
+    noBtn.Parent = modal
+
+    local noCorner = Instance.new("UICorner")
+    noCorner.CornerRadius = Library.Theme.ElementCorner
+    noCorner.Parent = noBtn
+
+    yesBtn.MouseButton1Click:Connect(function()
+        overlay:Destroy()
+        if onYes then onYes() end
+    end)
+
+    noBtn.MouseButton1Click:Connect(function()
+        overlay:Destroy()
+        if onNo then onNo() end
+    end)
 end
 
-function Library:AddColumn(title)
+function Library:AddColumn(title, customWidth)
+    local width = customWidth or self.DefaultWidth
+
     local columnFrame = Instance.new("Frame")
     columnFrame.Name = title .. "Column"
-    columnFrame.Size = UDim2.new(0, self.ColumnWidth, 0, self.ColumnHeight)
+    columnFrame.Size = UDim2.new(0, width, 0, self.ColumnHeight)
 
-    local initialPos = UDim2.new(0, 20 + (#self.Columns * (self.ColumnWidth + 10)), 0, 50)
+    local initialPos = UDim2.new(0, 20 + (#self.Columns * (self.DefaultWidth + 10)), 0, 50)
     columnFrame.Position = initialPos
     columnFrame.BackgroundColor3 = Library.Theme.ColumnBackground
     columnFrame.BorderSizePixel = 0
@@ -128,6 +189,7 @@ function Library:AddColumn(title)
     padding.Parent = container
 
     local colObj = {
+        Title = title,
         Frame = columnFrame,
         Container = container,
         LastValidPos = initialPos,
@@ -135,55 +197,22 @@ function Library:AddColumn(title)
     }
 
     Library.Draggable.Enable(columnFrame, header, function(draggedFrame)
-        local isOverlapping = false
-
-        for _, col in ipairs(self.Columns) do
-            if col.Frame ~= draggedFrame then
-                local overlap = calculateOverlapRatio(draggedFrame, col.Frame)
-                if overlap >= 0.80 then
-                    isOverlapping = true
-                    break
-                end
-            end
-        end
-
+        -- Логика защиты от наложения
         local targetPos = colObj.LastValidPos
-
-        if isOverlapping then
-            local lastPosOccupied = false
-            for _, col in ipairs(self.Columns) do
-                if col.Frame ~= draggedFrame then
-                    local dist = (Vector2.new(col.Frame.Position.X.Offset, col.Frame.Position.Y.Offset) -
-                                  Vector2.new(colObj.LastValidPos.X.Offset, colObj.LastValidPos.Y.Offset)).Magnitude
-                    if dist < (self.ColumnWidth * 0.8) then
-                        lastPosOccupied = true
-                        break
-                    end
-                end
-            end
-
-            if lastPosOccupied then
-                targetPos = self:FindFreePosition(colObj)
-            end
-
-            TweenService:Create(draggedFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                Position = targetPos
-            }):Play()
-        else
-            colObj.LastValidPos = draggedFrame.Position
-        end
+        colObj.LastValidPos = draggedFrame.Position
     end)
 
     table.insert(self.Columns, colObj)
     return colObj
 end
 
-function Library:SetColumnSize(width, height)
-    self.ColumnWidth = width
-    self.ColumnHeight = height
+function Library:GetColumn(title)
     for _, col in ipairs(self.Columns) do
-        col.Frame.Size = UDim2.new(0, width, 0, height)
+        if col.Title:lower() == title:lower() then
+            return col
+        end
     end
+    return nil
 end
 
 return Library
