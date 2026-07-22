@@ -1,5 +1,4 @@
--- [File 5/10] src/Elements/Toggle.lua
-local Theme = require(script.Parent.Parent.Theme)
+local Theme = import("src/Theme.lua")
 
 return function(container, text, default, callback)
     local state = default or false

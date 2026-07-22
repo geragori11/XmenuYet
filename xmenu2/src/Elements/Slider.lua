@@ -1,6 +1,5 @@
--- [File 6/10] src/Elements/Slider.lua
 local UserInputService = game:GetService("UserInputService")
-local Theme = require(script.Parent.Parent.Theme)
+local Theme = import("src/Theme.lua")
 
 return function(container, text, min, max, default, callback)
     local value = default or min

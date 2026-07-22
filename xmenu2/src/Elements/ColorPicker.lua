@@ -1,5 +1,4 @@
--- [File 8/10] src/Elements/ColorPicker.lua
-local Theme = require(script.Parent.Parent.Theme)
+local Theme = import("src/Theme.lua")
 
 return function(container, text, defaultColor, callback)
     local currentColor = defaultColor or Color3.fromRGB(255, 255, 255)
@@ -26,7 +25,6 @@ return function(container, text, defaultColor, callback)
     colorPreview.Parent = frame
 
     colorPreview.MouseButton1Click:Connect(function()
-        -- Пример смены цвета (циклический сдвиг для демонстрации)
         currentColor = Color3.fromHSV(math.random(), 1, 1)
         colorPreview.BackgroundColor3 = currentColor
         if callback then callback(currentColor) end

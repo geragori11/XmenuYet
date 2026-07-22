@@ -1,5 +1,4 @@
--- [File 9/10] src/Elements/TextInput.lua
-local Theme = require(script.Parent.Parent.Theme)
+local Theme = import("src/Theme.lua")
 
 return function(container, placeholder, callback)
     local textBox = Instance.new("TextBox")

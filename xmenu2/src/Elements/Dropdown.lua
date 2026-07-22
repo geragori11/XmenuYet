@@ -1,5 +1,4 @@
--- [File 7/10] src/Elements/Dropdown.lua
-local Theme = require(script.Parent.Parent.Theme)
+local Theme = import("src/Theme.lua")
 
 return function(container, text, options, callback)
     local expanded = false
