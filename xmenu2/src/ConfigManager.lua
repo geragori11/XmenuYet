@@ -5,19 +5,33 @@ local Theme = import("src/Theme.lua")
 local ConfigManager = {}
 ConfigManager.FolderPath = "xmenu2_configs"
 
--- Вспомогательная функция: убираем .json в конце (если есть)
-function ConfigManager.NormalizeConfigName(name)
-    if not name or name == "" then return name end
-    -- Удаляем .json в конце (регистронезависимо)
-    return name:gsub("%.json$", "", 1):gsub("%.JSON$", "", 1)
-end
-
+-- ===== Вспомогательные функции =====
 function ConfigManager.EnsureFolder()
     if not isfolder(ConfigManager.FolderPath) then
         makefolder(ConfigManager.FolderPath)
     end
 end
 
+-- Удаляет .json в конце (регистронезависимо)
+function ConfigManager.NormalizeConfigName(name)
+    if not name or name == "" then return name end
+    return name:gsub("%.json$", "", 1):gsub("%.JSON$", "", 1)
+end
+
+-- Возвращает полный путь к файлу по имени конфига
+function ConfigManager.GetFilePath(configName)
+    configName = ConfigManager.NormalizeConfigName(configName)
+    if not configName or configName == "" then return nil end
+    return ConfigManager.FolderPath .. "/" .. configName .. ".json"
+end
+
+-- Проверяет существование конфига
+function ConfigManager.Exists(configName)
+    local path = ConfigManager.GetFilePath(configName)
+    return path and isfile(path)
+end
+
+-- ===== Основные операции =====
 function ConfigManager.Save(configName, libraryObj)
     configName = ConfigManager.NormalizeConfigName(configName)
     if not configName or configName == "" then
@@ -26,7 +40,7 @@ function ConfigManager.Save(configName, libraryObj)
     end
 
     ConfigManager.EnsureFolder()
-    local path = ConfigManager.FolderPath .. "/" .. configName .. ".json"
+    local path = ConfigManager.GetFilePath(configName)
 
     local function DoSave()
         local saveTable = {}
@@ -35,7 +49,7 @@ function ConfigManager.Save(configName, libraryObj)
         end
         local json = HttpService:JSONEncode(saveTable)
         writefile(path, json)
-        print("[Config] Успешно сохранён:", configName)
+        print("[Config] ✅ Сохранён:", configName)
         if ConfigManager.RefreshList then ConfigManager.RefreshList() end
     end
 
@@ -44,7 +58,7 @@ function ConfigManager.Save(configName, libraryObj)
             "Перезапись конфига",
             "Вы точно хотите сохранить изменения в уже существующий конфиг '" .. configName .. "'?",
             DoSave,
-            function() print("[Config] Сохранение отменено пользователем") end
+            function() print("[Config] ❌ Сохранение отменено") end
         )
     else
         DoSave()
@@ -54,8 +68,7 @@ end
 function ConfigManager.Load(configName, libraryObj)
     configName = ConfigManager.NormalizeConfigName(configName)
     if not configName or configName == "" then return end
-
-    local path = ConfigManager.FolderPath .. "/" .. configName .. ".json"
+    local path = ConfigManager.GetFilePath(configName)
     if isfile(path) then
         local raw = readfile(path)
         local data = HttpService:JSONDecode(raw)
@@ -65,20 +78,23 @@ function ConfigManager.Load(configName, libraryObj)
                     libraryObj.Flags[flagKey].Set(storedVal)
                 end
             end
-            print("[Config] Успешно загружен:", configName)
+            print("[Config] ✅ Загружен:", configName)
         end
+    else
+        print("[Config] ❌ Файл не найден:", path)
     end
 end
 
 function ConfigManager.Delete(configName)
     configName = ConfigManager.NormalizeConfigName(configName)
     if not configName or configName == "" then return end
-
-    ConfigManager.EnsureFolder()
-    local path = ConfigManager.FolderPath .. "/" .. configName .. ".json"
+    local path = ConfigManager.GetFilePath(configName)
     if isfile(path) then
         delfile(path)
-        print("[Config] Удалён:", configName)
+        print("[Config] 🗑️ Удалён:", configName)
+        if ConfigManager.RefreshList then ConfigManager.RefreshList() end
+    else
+        print("[Config] ❌ Файл не найден для удаления:", path)
     end
 end
 
@@ -87,13 +103,13 @@ function ConfigManager.ListConfigs()
     return listfiles(ConfigManager.FolderPath)
 end
 
+-- ===== Отрисовка UI =====
 function ConfigManager.RenderUI(container, libraryObj)
     local AddTextInput = import("src/Elements/TextInput.lua")
     local currentConfigName = "default"
 
-    -- Поле ввода имени конфига
+    -- Поле ввода имени
     AddTextInput(container, "Имя конфига...", function(txt)
-        -- Можно сразу нормализовать, но оставим для удобства пользователя
         currentConfigName = txt
     end)
 
@@ -128,6 +144,7 @@ function ConfigManager.RenderUI(container, libraryObj)
 
     -- Функция обновления списка
     ConfigManager.RefreshList = function()
+        -- Удаляем все карточки, кроме UIListLayout
         for _, child in ipairs(listFrame:GetChildren()) do
             if not child:IsA("UIListLayout") then
                 child:Destroy()
@@ -151,11 +168,11 @@ function ConfigManager.RenderUI(container, libraryObj)
             listFrame.Size = UDim2.new(1, 0, 0, fileCount * 34)
 
             for idx, filePath in ipairs(files) do
-                -- Извлекаем имя файла (без пути и расширения)
-                local fileName = string.match(filePath, "([^/\\]+)%.json$") or filePath
-                if fileName:find("[/\\]") then
-                    fileName = fileName:match("([^/\\]+)$") or fileName
-                end
+                -- Надёжно извлекаем имя файла (последняя часть пути)
+                local fullFileName = filePath:match("([^/\\]+)$")
+                if not fullFileName then fullFileName = filePath end
+                -- Убираем расширение .json для отображения и операций
+                local displayName = fullFileName:gsub("%.json$", "", 1):gsub("%.JSON$", "", 1)
 
                 local card = Instance.new("Frame")
                 card.Size = UDim2.new(1, 0, 0, 30)
@@ -171,7 +188,7 @@ function ConfigManager.RenderUI(container, libraryObj)
                 nameLabel.Size = UDim2.new(0.38, -4, 1, 0)
                 nameLabel.Position = UDim2.new(0, 4, 0, 0)
                 nameLabel.BackgroundTransparency = 1
-                nameLabel.Text = "📄 " .. fileName
+                nameLabel.Text = "📄 " .. displayName
                 nameLabel.TextColor3 = Theme.TextColor
                 nameLabel.Font = Enum.Font.SourceSans
                 nameLabel.TextSize = 11
@@ -179,6 +196,7 @@ function ConfigManager.RenderUI(container, libraryObj)
                 nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
                 nameLabel.Parent = card
 
+                -- Кнопка "Загрузить"
                 local loadBtn = Instance.new("TextButton")
                 loadBtn.Size = UDim2.new(0.32, 0, 0.8, 0)
                 loadBtn.Position = UDim2.new(0.39, 0, 0.1, 0)
@@ -193,9 +211,10 @@ function ConfigManager.RenderUI(container, libraryObj)
                 loadCorner.Parent = loadBtn
 
                 loadBtn.MouseButton1Click:Connect(function()
-                    ConfigManager.Load(fileName, libraryObj)
+                    ConfigManager.Load(displayName, libraryObj)
                 end)
 
+                -- Кнопка "Удалить"
                 local delBtn = Instance.new("TextButton")
                 delBtn.Size = UDim2.new(0.25, 0, 0.8, 0)
                 delBtn.Position = UDim2.new(0.72, 0, 0.1, 0)
@@ -210,8 +229,7 @@ function ConfigManager.RenderUI(container, libraryObj)
                 delCorner.Parent = delBtn
 
                 delBtn.MouseButton1Click:Connect(function()
-                    ConfigManager.Delete(fileName)
-                    ConfigManager.RefreshList()
+                    ConfigManager.Delete(displayName)
                 end)
             end
         end
@@ -222,11 +240,11 @@ function ConfigManager.RenderUI(container, libraryObj)
         if currentConfigName and currentConfigName ~= "" then
             ConfigManager.Save(currentConfigName, libraryObj)
         else
-            print("[Config] Имя конфига не может быть пустым")
+            print("[Config] ⚠️ Имя конфига не может быть пустым")
         end
     end)
 
-    -- Первичное отображение списка
+    -- Первоначальная отрисовка списка
     ConfigManager.RefreshList()
 end
 
