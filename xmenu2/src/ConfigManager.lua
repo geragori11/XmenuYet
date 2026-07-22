@@ -43,12 +43,12 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
 
     local currentConfigName = "default"
 
-    -- 1. Поле ввода имени
+    -- 1. Поле ввода имени конфига
     AddTextInput(container, "Имя конфига...", function(txt)
         currentConfigName = txt
     end)
 
-    -- 2. Кнопка "Сохранить конфиг" (Прямая кнопка без состояний тумблера)
+    -- 2. Кнопка "Сохранить конфиг"
     local saveBtn = Instance.new("TextButton")
     saveBtn.Name = "SaveConfigButton"
     saveBtn.Size = UDim2.new(1, 0, 0, 26)
@@ -64,7 +64,7 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
     saveCorner.CornerRadius = Theme.ElementCorner
     saveCorner.Parent = saveBtn
 
-    -- 3. Контейнер списка конфигов
+    -- 3. Контейнер списка карточек
     local listFrame = Instance.new("Frame")
     listFrame.Name = "ConfigListHolder"
     listFrame.Size = UDim2.new(1, 0, 0, 24)
@@ -88,7 +88,6 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
         local files = ConfigManager.ListConfigs()
 
         if #files == 0 then
-            -- Сообщение, если конфигов нет
             listFrame.Size = UDim2.new(1, 0, 0, 24)
             local emptyLabel = Instance.new("TextLabel")
             emptyLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -99,15 +98,14 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
             emptyLabel.TextSize = 11
             emptyLabel.Parent = listFrame
         else
-            -- Точный расчёт высоты всей секции в пикселях (#файлов * 32px)
-            listFrame.Size = UDim2.new(1, 0, 0, #files * 32)
+            listFrame.Size = UDim2.new(1, 0, 0, #files * 34)
 
             for idx, filePath in ipairs(files) do
                 local fileName = string.match(filePath, "([^/]+)%.json$") or filePath
 
                 local card = Instance.new("Frame")
                 card.Name = "Card_" .. fileName
-                card.Size = UDim2.new(1, 0, 0, 28)
+                card.Size = UDim2.new(1, 0, 0, 30)
                 card.BackgroundColor3 = Theme.ElementBackground
                 card.LayoutOrder = idx
                 card.Parent = listFrame
@@ -116,17 +114,33 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
                 cardCorner.CornerRadius = Theme.ElementCorner
                 cardCorner.Parent = card
 
-                -- Нажатие на название = Загрузить
+                -- Имя файла
+                local nameLabel = Instance.new("TextLabel")
+                nameLabel.Size = UDim2.new(0.35, -4, 1, 0)
+                nameLabel.Position = UDim2.new(0, 4, 0, 0)
+                nameLabel.BackgroundTransparency = 1
+                nameLabel.Text = "📄 " .. fileName
+                nameLabel.TextColor3 = Theme.TextColor
+                nameLabel.Font = Enum.Font.SourceSans
+                nameLabel.TextSize = 11
+                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+                nameLabel.Parent = card
+
+                -- Кнопка "Загрузить"
                 local loadBtn = Instance.new("TextButton")
-                loadBtn.Size = UDim2.new(0.68, -4, 1, 0)
-                loadBtn.Position = UDim2.new(0, 4, 0, 0)
-                loadBtn.BackgroundTransparency = 1
-                loadBtn.Text = "📄 " .. fileName
-                loadBtn.TextColor3 = Theme.TextColor
-                loadBtn.Font = Enum.Font.SourceSans
-                loadBtn.TextSize = 12
-                loadBtn.TextXAlignment = Enum.TextXAlignment.Left
+                loadBtn.Size = UDim2.new(0.35, 0, 0.8, 0)
+                loadBtn.Position = UDim2.new(0.36, 0, 0.1, 0)
+                loadBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 70)
+                loadBtn.Text = "Загрузить"
+                loadBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                loadBtn.Font = Enum.Font.SourceSansBold
+                loadBtn.TextSize = 10
                 loadBtn.Parent = card
+
+                local loadCorner = Instance.new("UICorner")
+                loadCorner.CornerRadius = UDim.new(0, 4)
+                loadCorner.Parent = loadBtn
 
                 loadBtn.MouseButton1Click:Connect(function()
                     local data = ConfigManager.Load(fileName)
@@ -135,10 +149,10 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
                     end
                 end)
 
-                -- Кнопка Удалить
+                -- Кнопка "Удалить"
                 local delBtn = Instance.new("TextButton")
-                delBtn.Size = UDim2.new(0.28, -4, 0.8, 0)
-                delBtn.Position = UDim2.new(0.7, 0, 0.1, 0)
+                delBtn.Size = UDim2.new(0.25, 0, 0.8, 0)
+                delBtn.Position = UDim2.new(0.73, 0, 0.1, 0)
                 delBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
                 delBtn.Text = "Удалить"
                 delBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -158,7 +172,6 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
         end
     end
 
-    -- Нажатие кнопки "Сохранить конфиг"
     saveBtn.MouseButton1Click:Connect(function()
         if currentConfigName and currentConfigName ~= "" then
             local dataToSave = getSaveDataCallback and getSaveDataCallback() or {}
