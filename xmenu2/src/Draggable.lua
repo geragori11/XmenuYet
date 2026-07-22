@@ -1,9 +1,9 @@
--- [File 3/10] src/Draggable.lua
+-- [File: src/Draggable.lua]
 local UserInputService = game:GetService("UserInputService")
 
 local Draggable = {}
 
-function Draggable.Enable(frame, dragHandle)
+function Draggable.Enable(frame, dragHandle, onDragEnd)
     dragHandle = dragHandle or frame
     local dragging = false
     local dragInput, dragStart, startPos
@@ -16,7 +16,12 @@ function Draggable.Enable(frame, dragHandle)
 
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
+                    if dragging then
+                        dragging = false
+                        if onDragEnd then
+                            onDragEnd(frame)
+                        end
+                    end
                 end
             end)
         end
@@ -29,7 +34,7 @@ function Draggable.Enable(frame, dragHandle)
     end)
 
     UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
+        if dragging and input == dragInput then
             local delta = input.Position - dragStart
             frame.Position = UDim2.new(
                 startPos.X.Scale, startPos.X.Offset + delta.X,

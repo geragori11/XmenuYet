@@ -1,3 +1,4 @@
+-- [File: src/Elements/Slider.lua]
 local UserInputService = game:GetService("UserInputService")
 local Theme = import("src/Theme.lua")
 
@@ -5,29 +6,43 @@ return function(container, text, min, max, default, callback)
     local value = default or min
 
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, -8, 0, 36)
+    frame.Size = UDim2.new(1, 0, 0, 38)
     frame.BackgroundColor3 = Theme.ElementBackground
     frame.Parent = container
 
+    local frameCorner = Instance.new("UICorner")
+    frameCorner.CornerRadius = Theme.ElementCorner
+    frameCorner.Parent = frame
+
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 18)
+    label.Size = UDim2.new(1, -10, 0, 18)
+    label.Position = UDim2.new(0, 5, 0, 2)
     label.BackgroundTransparency = 1
     label.Text = text .. ": " .. tostring(value)
     label.TextColor3 = Theme.TextColor
     label.Font = Enum.Font.SourceSans
     label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = frame
 
     local track = Instance.new("Frame")
     track.Size = UDim2.new(0.9, 0, 0, 6)
-    track.Position = UDim2.new(0.05, 0, 0.65, 0)
-    track.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    track.Position = UDim2.new(0.05, 0, 0.68, 0)
+    track.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
     track.Parent = frame
+
+    local trackCorner = Instance.new("UICorner")
+    trackCorner.CornerRadius = UDim.new(1, 0)
+    trackCorner.Parent = track
 
     local fill = Instance.new("Frame")
     fill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
     fill.BackgroundColor3 = Theme.AccentColor
     fill.Parent = track
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(1, 0)
+    fillCorner.Parent = fill
 
     local dragging = false
     local function update(input)
