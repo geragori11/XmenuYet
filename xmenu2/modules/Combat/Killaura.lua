@@ -1,6 +1,6 @@
 -- [File: modules/Combat/Killaura.lua]
 local AddSlider = import("src/Elements/Slider.lua")
-local AddColorPicker = import("src/Elements/ColorPicker.lua")
+local AddColorPicker = import("src/Elements/ColorPicker.lua")  -- теперь это улучшенная версия
 
 return {
     Page = "Combat",
@@ -13,28 +13,40 @@ return {
     end,
 
     Settings = function(container)
-        -- Уникальный флаг для радиуса
+        -- Слайдер радиуса (остаётся без изменений)
         AddSlider(
             container,
-            "Радиус атаки",          -- текст
-            5,                       -- минимум
-            50,                      -- максимум
-            15,                      -- значение по умолчанию
-            function(v)              -- callback при изменении (опционально)
+            "Радиус атаки",
+            5,
+            50,
+            15,
+            function(v)
                 print("[Killaura] Радиус:", v)
             end,
-            "Killaura_Radius"        -- <-- flagName (обязательно для сохранения!)
+            "Killaura_Radius"
         )
 
-        -- Уникальный флаг для цвета
+        -- Теперь используем улучшенный ColorPicker
         AddColorPicker(
             container,
-            "Цвет таргета",                              -- текст
-            Color3.fromRGB(255, 0, 0),                  -- цвет по умолчанию
-            function(c)                                 -- callback (опционально)
-                print("[Killaura] Цвет:", c)
+            "Цвет таргета",
+            Color3.fromRGB(255, 0, 0),   -- цвет по умолчанию (красный)
+            function(color)
+                print("[Killaura] Цвет установлен:", color)
+                -- Здесь можно применить цвет к чему-то (например, к подсветке)
             end,
-            "Killaura_TargetColor"                      -- <-- flagName
+            "Killaura_TargetColor"        -- уникальный флаг для сохранения
+        )
+
+        -- Можно добавить ещё один ColorPicker, если нужно
+        AddColorPicker(
+            container,
+            "Цвет круга атаки",
+            Color3.fromRGB(0, 150, 255),
+            function(color)
+                print("[Killaura] Цвет круга:", color)
+            end,
+            "Killaura_CircleColor"
         )
     end
 }
