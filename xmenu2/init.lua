@@ -28,7 +28,6 @@ function Library.new(title)
     self.DefaultWidth = 190
     self.ColumnHeight = 420
 
-    -- Сохраняем экземпляр для доступа из регистратора модулей
     Library.ActiveUI = self
 
     UserInputService.InputBegan:Connect(function(input, processed)
@@ -131,7 +130,7 @@ function Library:ShowConfirm(title, message, onYes, onNo)
     end)
 end
 
--- ===== НОВЫЙ МЕТОД: проверка перекрытия более чем на порог =====
+-- Проверка перекрытия более чем на порог
 function Library:IsOverlappingMoreThan(frame1, frame2, threshold)
     local absPos1 = frame1.AbsolutePosition
     local absSize1 = frame1.AbsoluteSize
@@ -153,7 +152,6 @@ function Library:IsOverlappingMoreThan(frame1, frame2, threshold)
     return false
 end
 
--- ===== ИЗМЕНЁННЫЙ МЕТОД AddColumn =====
 function Library:AddColumn(title, customWidth)
     local width = customWidth or self.DefaultWidth
 
@@ -211,59 +209,42 @@ function Library:AddColumn(title, customWidth)
     padding.PaddingBottom = UDim.new(0, 6)
     padding.Parent = container
 
-    -- Объект колонки с сохранением начальной и последней валидной позиции
     local colObj = {
         Title = title,
         Frame = columnFrame,
         Container = container,
-        LastValidPos = initialPos,
         InitialPos = initialPos,
         Library = self
     }
 
-    -- Подключаем перетаскивание с расширенным callback
-    Library.Draggable.Enable(columnFrame, header, function(draggedFrame)
-        -- Проверяем перекрытие с другими колонками
-        local overlap = false
-        for _, otherCol in ipairs(self.Columns) do
-            if otherCol.Frame ~= draggedFrame then
-                if self:IsOverlappingMoreThan(draggedFrame, otherCol.Frame, 0.8) then
-                    overlap = true
-                    break
-                end
-            end
-        end
-
-        if overlap then
-            -- Пытаемся вернуть на последнюю валидную позицию
-            local targetPos = colObj.LastValidPos
-            if targetPos then
-                local oldPos = draggedFrame.Position
-                draggedFrame.Position = targetPos
-                -- Проверяем, не перекрывает ли целевая позиция другие колонки
-                local stillOverlap = false
-                for _, otherCol in ipairs(self.Columns) do
-                    if otherCol.Frame ~= draggedFrame then
-                        if self:IsOverlappingMoreThan(draggedFrame, otherCol.Frame, 0.8) then
-                            stillOverlap = true
-                            break
-                        end
+    -- Подключаем перетаскивание с двумя колбэками
+    Library.Draggable.Enable(columnFrame, header,
+        function(frame, startPos)
+            -- При старте запоминаем начальную позицию (можно использовать для чего-то ещё)
+            colObj.DragStartPos = startPos
+        end,
+        function(frame, startPos)
+            -- При завершении проверяем перекрытие
+            local overlap = false
+            for _, otherCol in ipairs(self.Columns) do
+                if otherCol.Frame ~= frame then
+                    if self:IsOverlappingMoreThan(frame, otherCol.Frame, 0.8) then
+                        overlap = true
+                        break
                     end
                 end
-                if stillOverlap then
-                    -- Если LastValidPos тоже занята – возвращаем на начальную
-                    draggedFrame.Position = colObj.InitialPos
-                end
-                -- иначе оставляем на targetPos (уже установлена)
-            else
-                -- Если LastValidPos нет – на начальную
-                draggedFrame.Position = colObj.InitialPos
             end
-        else
-            -- Позиция допустима – запоминаем как последнюю валидную
-            colObj.LastValidPos = draggedFrame.Position
+
+            if overlap then
+                -- Возвращаем на позицию, которая была до начала перетаскивания
+                frame.Position = startPos
+            else
+                -- Если перекрытия нет – запоминаем текущую позицию как "последнюю валидную"
+                -- (она же теперь будет стартовой при следующем перетаскивании)
+                colObj.InitialPos = frame.Position
+            end
         end
-    end)
+    )
 
     table.insert(self.Columns, colObj)
     return colObj
