@@ -1,3 +1,4 @@
+-- [File: src/Elements/ColorPicker.lua]
 local Theme = import("src/Theme.lua")
 local UserInputService = game:GetService("UserInputService")
 
@@ -7,7 +8,7 @@ local function createRingPointer(size, thickness)
     ring.Size = UDim2.fromOffset(size, size)
     ring.AnchorPoint = Vector2.new(0.5, 0.5)
     ring.BackgroundTransparency = 1
-    ring.ZIndex = 10
+    ring.ZIndex = 210
 
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(1, 0)
@@ -22,208 +23,341 @@ local function createRingPointer(size, thickness)
     return ring
 end
 
+local function Color3ToHex(c)
+    local function toHex(num)
+        local n = math.floor(num * 255)
+        return string.format("%02X", n)
+    end
+    return "#" .. toHex(c.R) .. toHex(c.G) .. toHex(c.B)
+end
+
+local function HexToColor3(hex)
+    hex = hex:gsub("#", "")
+    if #hex == 6 then
+        local r = tonumber(hex:sub(1, 2), 16) or 0
+        local g = tonumber(hex:sub(3, 4), 16) or 0
+        local b = tonumber(hex:sub(5, 6), 16) or 0
+        return Color3.new(r / 255, g / 255, b / 255)
+    end
+    return nil
+end
+
 return function(container, text, defaultColor, callback, flagName)
     local currentColor = defaultColor or Color3.fromRGB(255, 0, 0)
-    local h, s, v = currentColor:ToHSV()
+    local popupOpen = false
 
-    -- Главный контейнер
+    -- 1. Элемент строки в контейнере настроек (26px)
     local frame = Instance.new("Frame")
-    frame.Name = "ColorPickerContainer"
-    frame.Size = UDim2.new(1, -8, 0, 180)
-    frame.BackgroundTransparency = 1
+    frame.Name = "ColorPickerRow"
+    frame.Size = UDim2.new(1, 0, 0, 26)
+    frame.BackgroundColor3 = Theme.ElementBackground
+    frame.LayoutOrder = #container:GetChildren()
     frame.Parent = container
 
-    local layout = Instance.new("UIListLayout")
-    layout.FillDirection = Enum.FillDirection.Horizontal
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 10)
-    layout.Parent = frame
+    local rowCorner = Instance.new("UICorner")
+    rowCorner.CornerRadius = Theme.ElementCorner
+    rowCorner.Parent = frame
 
-    -- ==========================================
-    -- 1. Поле Выбора Насыщенности и Яркости (SV)
-    -- ==========================================
-    local svBox = Instance.new("Frame")
-    svBox.Name = "SVBox"
-    svBox.Size = UDim2.new(1, -28, 1, 0) -- Авто-размер с учетом ширины полосы Hue
-    svBox.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-    svBox.ClipsDescendants = false
-    svBox.LayoutOrder = 1
-    svBox.Parent = frame
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, -8, 1, 0)
+    label.Position = UDim2.new(0, 8, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Theme.TextColor
+    label.Font = Enum.Font.SourceSans
+    label.TextSize = 13
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
 
-    local svCorner = Instance.new("UICorner")
-    svCorner.CornerRadius = UDim.new(0, 8)
-    svCorner.Parent = svBox
+    -- Кнопка-превью цвета справа
+    local colorPreview = Instance.new("TextButton")
+    colorPreview.Size = UDim2.new(0, 32, 0, 16)
+    colorPreview.Position = UDim2.new(1, -38, 0.5, -8)
+    colorPreview.BackgroundColor3 = currentColor
+    colorPreview.Text = ""
+    colorPreview.AutoButtonColor = false
+    colorPreview.Parent = frame
 
-    -- Белый градиент (Слева направо: Насыщенность)
-    local satFrame = Instance.new("Frame")
-    satFrame.Size = UDim2.fromScale(1, 1)
-    satFrame.BackgroundTransparency = 1
-    satFrame.Parent = svBox
+    local previewCorner = Instance.new("UICorner")
+    previewCorner.CornerRadius = UDim.new(0, 4)
+    previewCorner.Parent = colorPreview
 
-    local satCorner = Instance.new("UICorner")
-    satCorner.CornerRadius = UDim.new(0, 8)
-    satCorner.Parent = satFrame
+    local previewStroke = Instance.new("UIStroke")
+    previewStroke.Thickness = 1
+    previewStroke.Color = Color3.fromRGB(60, 60, 70)
+    previewStroke.Parent = colorPreview
 
-    local satGradient = Instance.new("UIGradient")
-    satGradient.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
-    satGradient.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-    satGradient.Rotation = 0
-    satGradient.Parent = satFrame
+    local function setColor(color, skipCallback)
+        currentColor = color
+        colorPreview.BackgroundColor3 = color
 
-    -- Черный градиент (Сверху вниз: Яркость)
-    local valFrame = Instance.new("Frame")
-    valFrame.Size = UDim2.fromScale(1, 1)
-    valFrame.BackgroundTransparency = 1
-    valFrame.Parent = svBox
+        if not skipCallback and callback then
+            callback(color)
+        end
 
-    local valCorner = Instance.new("UICorner")
-    valCorner.CornerRadius = UDim.new(0, 8)
-    valCorner.Parent = valFrame
-
-    local valGradient = Instance.new("UIGradient")
-    valGradient.Color = ColorSequence.new(Color3.fromRGB(0, 0, 0))
-    valGradient.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 1),
-        NumberSequenceKeypoint.new(1, 0)
-    })
-    valGradient.Rotation = 90
-    valGradient.Parent = valFrame
-
-    -- Кольцевой указатель для SV
-    local svPointer = createRingPointer(18, 3)
-    svPointer.Parent = svBox
-
-    -- ==========================================
-    -- 2. Вертикальная Полоса Оттенка (Hue Bar)
-    -- ==========================================
-    local hueBar = Instance.new("Frame")
-    hueBar.Name = "HueBar"
-    hueBar.Size = UDim2.new(0, 18, 1, 0)
-    hueBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    hueBar.ClipsDescendants = false
-    hueBar.LayoutOrder = 2
-    hueBar.Parent = frame
-
-    local hueCorner = Instance.new("UICorner")
-    hueCorner.CornerRadius = UDim.new(1, 0) -- Закругление в форме пилюли
-    hueCorner.Parent = hueBar
-
-    local hueGradient = Instance.new("UIGradient")
-    hueGradient.Rotation = 90
-    hueGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
-        ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
-        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
-        ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 255)),
-        ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
-        ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
-        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0))
-    })
-    hueGradient.Parent = hueBar
-
-    -- Кольцевой указатель для Hue
-    local huePointer = createRingPointer(18, 3)
-    huePointer.Parent = hueBar
-
-    -- ==========================================
-    -- Логика обновления и взаимодействия
-    -- ==========================================
-    local function updateColor()
-        currentColor = Color3.fromHSV(h, s, v)
-
-        -- Обновляем цвет фона SV поля
-        svBox.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-
-        -- Обновляем позицию пикера SV
-        svPointer.Position = UDim2.fromScale(s, 1 - v)
-
-        -- Обновляем позицию пикера Hue
-        huePointer.Position = UDim2.fromScale(0.5, h)
-
-        -- Колбэк и флаги
-        if callback then callback(currentColor) end
         if flagName then
             local Lib = import("init.lua")
             if Lib.Flags and Lib.Flags[flagName] then
-                Lib.Flags[flagName].Value = currentColor
+                Lib.Flags[flagName].Value = color
             end
         end
     end
 
-    local draggingSV = false
-    local draggingHue = false
+    -- 2. Создание всплывающего окна (Popup)
+    local function openPopup()
+        if popupOpen then return end
+        popupOpen = true
 
-    local function updateSVFromInput(input)
-        local absPos = svBox.AbsolutePosition
-        local absSize = svBox.AbsoluteSize
-        local mousePos = input.Position
+        local screenGui = container:FindFirstAncestorOfClass("ScreenGui") or game:GetService("CoreGui")
 
-        local relativeX = math.clamp((mousePos.X - absPos.X) / absSize.X, 0, 1)
-        local relativeY = math.clamp((mousePos.Y - absPos.Y) / absSize.Y, 0, 1)
+        -- Тёмная подложка-оверлей
+        local overlay = Instance.new("TextButton")
+        overlay.Name = "ColorPickerOverlay"
+        overlay.Size = UDim2.new(1, 0, 1, 0)
+        overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        overlay.BackgroundTransparency = 0.5
+        overlay.Text = ""
+        overlay.AutoButtonColor = false
+        overlay.ZIndex = 200
+        overlay.Parent = screenGui
 
-        s = relativeX
-        v = 1 - relativeY
-        updateColor()
-    end
+        -- Модальное окно выбора цвета
+        local popup = Instance.new("Frame")
+        popup.Name = "ColorPickerPopup"
+        popup.Size = UDim2.new(0, 230, 0, 250)
+        popup.Position = UDim2.new(0.5, -115, 0.5, -125)
+        popup.BackgroundColor3 = Theme.ColumnBackground
+        popup.ZIndex = 201
+        popup.Parent = overlay
 
-    local function updateHueFromInput(input)
-        local absPos = hueBar.AbsolutePosition
-        local absSize = hueBar.AbsoluteSize
-        local mousePos = input.Position
+        local popupCorner = Instance.new("UICorner")
+        popupCorner.CornerRadius = Theme.ColumnCorner
+        popupCorner.Parent = popup
 
-        local relativeY = math.clamp((mousePos.Y - absPos.Y) / absSize.Y, 0, 1)
-        h = relativeY
-        updateColor()
-    end
+        -- Заголовок модального окна
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(1, -16, 0, 28)
+        title.Position = UDim2.new(0, 10, 0, 4)
+        title.BackgroundTransparency = 1
+        title.Text = text
+        title.TextColor3 = Theme.TextColor
+        title.Font = Enum.Font.SourceSansBold
+        title.TextSize = 13
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.ZIndex = 202
+        title.Parent = popup
 
-    -- Обработка событий ввода
-    svBox.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingSV = true
-            updateSVFromInput(input)
+        local h, s, v = currentColor:ToHSV()
+
+        -- --- SV Поле (Насыщенность / Яркость) ---
+        local svBox = Instance.new("Frame")
+        svBox.Name = "SVBox"
+        svBox.Size = UDim2.new(0, 165, 0, 165)
+        svBox.Position = UDim2.new(0, 10, 0, 34)
+        svBox.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+        svBox.ZIndex = 202
+        svBox.Parent = popup
+
+        local svCorner = Instance.new("UICorner")
+        svCorner.CornerRadius = UDim.new(0, 6)
+        svCorner.Parent = svBox
+
+        -- Белый градиент
+        local satFrame = Instance.new("Frame")
+        satFrame.Size = UDim2.fromScale(1, 1)
+        satFrame.BackgroundTransparency = 1
+        satFrame.ZIndex = 203
+        satFrame.Parent = svBox
+        local satCorner = Instance.new("UICorner")
+        satCorner.CornerRadius = UDim.new(0, 6)
+        satCorner.Parent = satFrame
+        local satGradient = Instance.new("UIGradient")
+        satGradient.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+        satGradient.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        satGradient.Parent = satFrame
+
+        -- Чёрный градиент
+        local valFrame = Instance.new("Frame")
+        valFrame.Size = UDim2.fromScale(1, 1)
+        valFrame.BackgroundTransparency = 1
+        valFrame.ZIndex = 204
+        valFrame.Parent = svBox
+        local valCorner = Instance.new("UICorner")
+        valCorner.CornerRadius = UDim.new(0, 6)
+        valCorner.Parent = valFrame
+        local valGradient = Instance.new("UIGradient")
+        valGradient.Color = ColorSequence.new(Color3.fromRGB(0, 0, 0))
+        valGradient.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        valGradient.Rotation = 90
+        valGradient.Parent = valFrame
+
+        local svPointer = createRingPointer(16, 2.5)
+        svPointer.Parent = svBox
+
+        -- --- Hue Полоса (Оттенок) ---
+        local hueBar = Instance.new("Frame")
+        hueBar.Name = "HueBar"
+        hueBar.Size = UDim2.new(0, 18, 0, 165)
+        hueBar.Position = UDim2.new(0, 185, 0, 34)
+        hueBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        hueBar.ZIndex = 202
+        hueBar.Parent = popup
+
+        local hueCorner = Instance.new("UICorner")
+        hueCorner.CornerRadius = UDim.new(1, 0)
+        hueCorner.Parent = hueBar
+
+        local hueGradient = Instance.new("UIGradient")
+        hueGradient.Rotation = 90
+        hueGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
+            ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+            ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 255)),
+            ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+            ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0))
+        })
+        hueGradient.Parent = hueBar
+
+        local huePointer = createRingPointer(18, 2.5)
+        huePointer.Parent = hueBar
+
+        -- --- HEX Поле ввода ---
+        local hexBox = Instance.new("TextBox")
+        hexBox.Size = UDim2.new(0, 95, 0, 24)
+        hexBox.Position = UDim2.new(0, 10, 0, 210)
+        hexBox.BackgroundColor3 = Theme.ElementBackground
+        hexBox.Text = Color3ToHex(currentColor)
+        hexBox.TextColor3 = Theme.TextColor
+        hexBox.Font = Enum.Font.SourceSans
+        hexBox.TextSize = 12
+        hexBox.ZIndex = 202
+        hexBox.Parent = popup
+
+        local hexCorner = Instance.new("UICorner")
+        hexCorner.CornerRadius = Theme.ElementCorner
+        hexCorner.Parent = hexBox
+
+        -- --- Кнопка "OK" ---
+        local okBtn = Instance.new("TextButton")
+        okBtn.Size = UDim2.new(0, 80, 0, 24)
+        okBtn.Position = UDim2.new(0, 123, 0, 210)
+        okBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 70)
+        okBtn.Text = "OK"
+        okBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        okBtn.Font = Enum.Font.SourceSansBold
+        okBtn.TextSize = 12
+        okBtn.ZIndex = 202
+        okBtn.Parent = popup
+
+        local okCorner = Instance.new("UICorner")
+        okCorner.CornerRadius = Theme.ElementCorner
+        okCorner.Parent = okBtn
+
+        -- Функция обновления состояния цвета
+        local function updateUI()
+            local col = Color3.fromHSV(h, s, v)
+            svBox.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+            svPointer.Position = UDim2.fromScale(s, 1 - v)
+            huePointer.Position = UDim2.fromScale(0.5, h)
+            hexBox.Text = Color3ToHex(col)
+            setColor(col)
         end
-    end)
 
-    hueBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingHue = true
-            updateHueFromInput(input)
+        -- Ручной ввод HEX
+        hexBox.FocusLost:Connect(function()
+            local col = HexToColor3(hexBox.Text)
+            if col then
+                h, s, v = col:ToHSV()
+                updateUI()
+            else
+                hexBox.Text = Color3ToHex(currentColor)
+            end
+        end)
+
+        -- Перетаскивание (Drag logic)
+        local draggingSV = false
+        local draggingHue = false
+
+        local function updateSVFromInput(input)
+            local absPos = svBox.AbsolutePosition
+            local absSize = svBox.AbsoluteSize
+            s = math.clamp((input.Position.X - absPos.X) / absSize.X, 0, 1)
+            v = 1 - math.clamp((input.Position.Y - absPos.Y) / absSize.Y, 0, 1)
+            updateUI()
         end
-    end)
 
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingSV = false
-            draggingHue = false
+        local function updateHueFromInput(input)
+            local absPos = hueBar.AbsolutePosition
+            local absSize = hueBar.AbsoluteSize
+            h = math.clamp((input.Position.Y - absPos.Y) / absSize.Y, 0, 1)
+            updateUI()
         end
-    end)
 
-    UserInputService.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            if draggingSV then
+        svBox.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingSV = true
                 updateSVFromInput(input)
-            elseif draggingHue then
+            end
+        end)
+
+        hueBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingHue = true
                 updateHueFromInput(input)
             end
+        end)
+
+        local inputEndedConn, inputChangedConn
+
+        inputEndedConn = UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingSV = false
+                draggingHue = false
+            end
+        end)
+
+        inputChangedConn = UserInputService.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                if draggingSV then
+                    updateSVFromInput(input)
+                elseif draggingHue then
+                    updateHueFromInput(input)
+                end
+            end
+        end)
+
+        local function closePopup()
+            if inputEndedConn then inputEndedConn:Disconnect() end
+            if inputChangedConn then inputChangedConn:Disconnect() end
+            overlay:Destroy()
+            popupOpen = false
         end
-    end)
+
+        okBtn.MouseButton1Click:Connect(closePopup)
+        overlay.MouseButton1Click:Connect(closePopup)
+
+        updateUI()
+    end
+
+    colorPreview.MouseButton1Click:Connect(openPopup)
 
     -- Регистрация флага
     if flagName then
         local Lib = import("init.lua")
         if Lib.RegisterFlag then
             Lib:RegisterFlag(flagName, currentColor, function(val)
-                h, s, v = val:ToHSV()
-                updateColor()
+                setColor(val)
             end)
         end
     end
-
-    -- Первоначальная установка
-    updateColor()
 
     return frame
 end
