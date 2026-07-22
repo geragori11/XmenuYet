@@ -12,6 +12,7 @@ return function(container, text, default, callback)
     button.Font = Enum.Font.SourceSans
     button.TextSize = 13
     button.TextXAlignment = Enum.TextXAlignment.Left
+    button.LayoutOrder = #container:GetChildren()
     button.Parent = container
 
     local corner = Instance.new("UICorner")

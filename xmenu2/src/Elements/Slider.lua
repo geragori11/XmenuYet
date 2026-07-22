@@ -8,6 +8,7 @@ return function(container, text, min, max, default, callback)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 0, 38)
     frame.BackgroundColor3 = Theme.ElementBackground
+    frame.LayoutOrder = #container:GetChildren()
     frame.Parent = container
 
     local frameCorner = Instance.new("UICorner")
@@ -72,4 +73,6 @@ return function(container, text, min, max, default, callback)
             update(input)
         end
     end)
+
+    return frame
 end

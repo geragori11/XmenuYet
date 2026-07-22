@@ -16,6 +16,7 @@ local function AddSection(container, title)
     label.Font = Enum.Font.SourceSansBold
     label.TextSize = 11
     label.TextXAlignment = Enum.TextXAlignment.Left
+    label.LayoutOrder = #container:GetChildren()
     label.Parent = container
 
     local corner = Instance.new("UICorner")
@@ -54,7 +55,6 @@ local configCol = UI:AddColumn("Configs")
 
 AddSection(configCol.Container, "Menu Settings")
 
--- Изменение бинда меню
 local keyNames = {"RightControl", "Insert", "RightShift"}
 AddDropdown(configCol.Container, "Menu Keybind", keyNames, function(selectedKey)
     if Enum.KeyCode[selectedKey] then
@@ -63,7 +63,6 @@ AddDropdown(configCol.Container, "Menu Keybind", keyNames, function(selectedKey)
     end
 end)
 
--- Изменение размеров колонок
 AddSlider(configCol.Container, "Width", 160, 240, 180, function(w)
     UI:SetColumnSize(w, UI.ColumnHeight)
 end)
@@ -72,19 +71,16 @@ AddSlider(configCol.Container, "Height", 300, 600, 400, function(h)
     UI:SetColumnSize(UI.ColumnWidth, h)
 end)
 
-AddSection(configCol.Container, "Config Manager")
+AddSection(configCol.Container, "Config Management")
 
--- ПОЛНАЯ ИНИЦИАЛИЗА ЯДРА КОНФИГОВ В ОДНУ СТРОКУ:
 Library.ConfigManager.RenderUI(
     configCol.Container,
-    -- Функция сбора данных для сохранения:
     function()
         return {
             Speed = 16,
             Key = tostring(UI.ToggleKey)
         }
     end,
-    -- Функция применения загруженного конфига:
     function(configName, data)
         print("Конфиг успешно загружен (" .. configName .. "):", data)
     end

@@ -38,19 +38,6 @@ function ConfigManager.ListConfigs()
     return listfiles(ConfigManager.FolderPath)
 end
 
--- Вспомогательная функция для строгого распределения порядка элементов
-local function getNextLayoutOrder(container)
-    local maxOrder = 0
-    for _, child in ipairs(container:GetChildren()) do
-        if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
-            if child.LayoutOrder > maxOrder then
-                maxOrder = child.LayoutOrder
-            end
-        end
-    end
-    return maxOrder + 1
-end
-
 function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallback)
     local AddToggle = import("src/Elements/Toggle.lua")
     local AddTextInput = import("src/Elements/TextInput.lua")
@@ -58,13 +45,12 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
     local currentConfigName = "default"
 
     -- 1. Поле ввода имени конфига
-    local textInput = AddTextInput(container, "Имя конфига...", function(txt)
+    AddTextInput(container, "Имя конфига...", function(txt)
         currentConfigName = txt
     end)
-    if textInput then textInput.LayoutOrder = getNextLayoutOrder(container) end
 
     -- 2. Кнопка "Сохранить конфиг"
-    local saveBtn = AddToggle(container, "Сохранить конфиг", false, function()
+    AddToggle(container, "Сохранить конфиг", false, function()
         if currentConfigName and currentConfigName ~= "" then
             local dataToSave = getSaveDataCallback and getSaveDataCallback() or {}
             ConfigManager.Save(currentConfigName, dataToSave)
@@ -73,32 +59,14 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
             end
         end
     end)
-    if saveBtn then saveBtn.LayoutOrder = getNextLayoutOrder(container) end
 
-    -- 3. Заголовок "СОХРАНЁННЫЕ КОНФИГИ"
-    local headerLabel = Instance.new("TextLabel")
-    headerLabel.Name = "SavedConfigsHeader"
-    headerLabel.Size = UDim2.new(1, 0, 0, 20)
-    headerLabel.BackgroundColor3 = Theme.SectionHeader
-    headerLabel.Text = "  СОХРАНЁННЫЕ КОНФИГИ"
-    headerLabel.TextColor3 = Theme.TextColor
-    headerLabel.Font = Enum.Font.SourceSansBold
-    headerLabel.TextSize = 10
-    headerLabel.TextXAlignment = Enum.TextXAlignment.Left
-    headerLabel.LayoutOrder = getNextLayoutOrder(container)
-    headerLabel.Parent = container
-
-    local headerCorner = Instance.new("UICorner")
-    headerCorner.CornerRadius = Theme.ElementCorner
-    headerCorner.Parent = headerLabel
-
-    -- 4. Динамический контейнер списка (всегда находится в самом НИЗУ!)
+    -- 3. Контейнер списка конфигов с авто-высотой
     local listFrame = Instance.new("Frame")
     listFrame.Name = "ConfigListHolder"
     listFrame.Size = UDim2.new(1, 0, 0, 0)
     listFrame.AutomaticSize = Enum.AutomaticSize.Y
     listFrame.BackgroundTransparency = 1
-    listFrame.LayoutOrder = getNextLayoutOrder(container)
+    listFrame.LayoutOrder = #container:GetChildren()
     listFrame.Parent = container
 
     local listLayout = Instance.new("UIListLayout")
@@ -130,7 +98,7 @@ function ConfigManager.RenderUI(container, getSaveDataCallback, onLoadDataCallba
             cardCorner.CornerRadius = Theme.ElementCorner
             cardCorner.Parent = card
 
-            -- Кнопка "Загрузить" (нажатие на название файла)
+            -- Кнопка "Загрузить" (нажатие на имя файла)
             local loadBtn = Instance.new("TextButton")
             loadBtn.Size = UDim2.new(0.68, -4, 1, 0)
             loadBtn.Position = UDim2.new(0, 4, 0, 0)
