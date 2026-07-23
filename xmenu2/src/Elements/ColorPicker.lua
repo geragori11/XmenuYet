@@ -1,8 +1,8 @@
 -- [File: src/Elements/ColorPicker.lua]
 local Theme = import("src/Theme.lua")
 local UserInputService = game:GetService("UserInputService")
+local Library = import("init.lua")
 
--- Вспомогательная функция для создания кольца-указателя
 local function createRingPointer(size, thickness)
     local ring = Instance.new("Frame")
     ring.Size = UDim2.fromOffset(size, size)
@@ -46,7 +46,6 @@ return function(container, text, defaultColor, callback, flagName)
     local currentColor = defaultColor or Color3.fromRGB(255, 0, 0)
     local popupOpen = false
 
-    -- 1. Элемент строки в контейнере настроек (26px)
     local frame = Instance.new("Frame")
     frame.Name = "ColorPickerRow"
     frame.Size = UDim2.new(1, 0, 0, 26)
@@ -69,7 +68,6 @@ return function(container, text, defaultColor, callback, flagName)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = frame
 
-    -- Кнопка-превью цвета справа
     local colorPreview = Instance.new("TextButton")
     colorPreview.Size = UDim2.new(0, 32, 0, 16)
     colorPreview.Position = UDim2.new(1, -38, 0.5, -8)
@@ -103,21 +101,18 @@ return function(container, text, defaultColor, callback, flagName)
         end
     end
 
-    -- 2. Создание всплывающего окна (Popup) с глобальным управлением
     local function openPopup()
         if popupOpen then return end
 
-        -- Закрыть предыдущий попап, если он существует
-        if _G.__CurrentColorPickerOverlay then
-            _G.__CurrentColorPickerOverlay:Destroy()
-            _G.__CurrentColorPickerOverlay = nil
+        if Library.ActiveUI and Library.ActiveUI.ColorPickerOverlay then
+            Library.ActiveUI.ColorPickerOverlay:Destroy()
+            Library.ActiveUI.ColorPickerOverlay = nil
         end
 
         popupOpen = true
 
         local screenGui = container:FindFirstAncestorOfClass("ScreenGui") or game:GetService("CoreGui")
 
-        -- Тёмная подложка-оверлей
         local overlay = Instance.new("Frame")
         overlay.Name = "ColorPickerOverlay"
         overlay.Size = UDim2.new(1, 0, 1, 0)
@@ -126,10 +121,10 @@ return function(container, text, defaultColor, callback, flagName)
         overlay.ZIndex = 200
         overlay.Parent = screenGui
 
-        -- Сохраняем в глобальную переменную для закрытия при открытии нового
-        _G.__CurrentColorPickerOverlay = overlay
+        if Library.ActiveUI then
+            Library.ActiveUI.ColorPickerOverlay = overlay
+        end
 
-        -- Модальное окно выбора цвета
         local popup = Instance.new("Frame")
         popup.Name = "ColorPickerPopup"
         popup.Size = UDim2.new(0, 230, 0, 250)
@@ -142,7 +137,6 @@ return function(container, text, defaultColor, callback, flagName)
         popupCorner.CornerRadius = Theme.ColumnCorner
         popupCorner.Parent = popup
 
-        -- Заголовок модального окна
         local title = Instance.new("TextLabel")
         title.Size = UDim2.new(1, -16, 0, 28)
         title.Position = UDim2.new(0, 10, 0, 4)
@@ -157,7 +151,6 @@ return function(container, text, defaultColor, callback, flagName)
 
         local h, s, v = currentColor:ToHSV()
 
-        -- --- SV Поле (Насыщенность / Яркость) ---
         local svBox = Instance.new("Frame")
         svBox.Name = "SVBox"
         svBox.Size = UDim2.new(0, 165, 0, 165)
@@ -170,7 +163,6 @@ return function(container, text, defaultColor, callback, flagName)
         svCorner.CornerRadius = UDim.new(0, 6)
         svCorner.Parent = svBox
 
-        -- Белый градиент
         local satFrame = Instance.new("Frame")
         satFrame.Size = UDim2.fromScale(1, 1)
         satFrame.BackgroundTransparency = 1
@@ -187,7 +179,6 @@ return function(container, text, defaultColor, callback, flagName)
         })
         satGradient.Parent = satFrame
 
-        -- Чёрный градиент
         local valFrame = Instance.new("Frame")
         valFrame.Size = UDim2.fromScale(1, 1)
         valFrame.BackgroundTransparency = 1
@@ -208,7 +199,6 @@ return function(container, text, defaultColor, callback, flagName)
         local svPointer = createRingPointer(16, 2.5)
         svPointer.Parent = svBox
 
-        -- --- Hue Полоса (Оттенок) ---
         local hueBar = Instance.new("Frame")
         hueBar.Name = "HueBar"
         hueBar.Size = UDim2.new(0, 18, 0, 165)
@@ -237,7 +227,6 @@ return function(container, text, defaultColor, callback, flagName)
         local huePointer = createRingPointer(18, 2.5)
         huePointer.Parent = hueBar
 
-        -- --- HEX Поле ввода ---
         local hexBox = Instance.new("TextBox")
         hexBox.Size = UDim2.new(0, 95, 0, 24)
         hexBox.Position = UDim2.new(0, 10, 0, 210)
@@ -253,7 +242,6 @@ return function(container, text, defaultColor, callback, flagName)
         hexCorner.CornerRadius = Theme.ElementCorner
         hexCorner.Parent = hexBox
 
-        -- --- Кнопка "OK" ---
         local okBtn = Instance.new("TextButton")
         okBtn.Size = UDim2.new(0, 80, 0, 24)
         okBtn.Position = UDim2.new(0, 123, 0, 210)
@@ -269,7 +257,6 @@ return function(container, text, defaultColor, callback, flagName)
         okCorner.CornerRadius = Theme.ElementCorner
         okCorner.Parent = okBtn
 
-        -- Функция обновления состояния цвета
         local function updateUI()
             local col = Color3.fromHSV(h, s, v)
             svBox.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
@@ -279,7 +266,6 @@ return function(container, text, defaultColor, callback, flagName)
             setColor(col)
         end
 
-        -- Ручной ввод HEX
         hexBox.FocusLost:Connect(function()
             local col = HexToColor3(hexBox.Text)
             if col then
@@ -290,7 +276,6 @@ return function(container, text, defaultColor, callback, flagName)
             end
         end)
 
-        -- Перетаскивание (Drag logic)
         local draggingSV = false
         local draggingHue = false
 
@@ -348,10 +333,11 @@ return function(container, text, defaultColor, callback, flagName)
             if overlayClickConn then overlayClickConn:Disconnect() end
             overlay:Destroy()
             popupOpen = false
-            _G.__CurrentColorPickerOverlay = nil
+            if Library.ActiveUI then
+                Library.ActiveUI.ColorPickerOverlay = nil
+            end
         end
 
-        -- Закрытие только при клике строго вне popup
         overlayClickConn = overlay.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 if input.Target and not input.Target:IsDescendantOf(popup) and input.Target ~= popup then
@@ -367,7 +353,6 @@ return function(container, text, defaultColor, callback, flagName)
 
     colorPreview.MouseButton1Click:Connect(openPopup)
 
-    -- Регистрация флага
     if flagName then
         local Lib = import("init.lua")
         if Lib.RegisterFlag then

@@ -2,6 +2,21 @@
 local Theme = import("src/Theme.lua")
 
 return function(container, text, options, callback, flagName, defaultOption)
+    -- Если опций нет – показываем заглушку
+    if not options or #options == 0 then
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, 0, 0, 26)
+        lbl.BackgroundColor3 = Theme.ElementBackground
+        lbl.Text = "  " .. text .. " (нет опций)"
+        lbl.TextColor3 = Theme.SubTextColor
+        lbl.Font = Enum.Font.SourceSans
+        lbl.TextSize = 13
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.LayoutOrder = #container:GetChildren()
+        lbl.Parent = container
+        return lbl
+    end
+
     local selected = defaultOption or options[1] or ""
     local expanded = false
 
@@ -69,7 +84,6 @@ return function(container, text, options, callback, flagName, defaultOption)
         listHolder.Size = UDim2.new(1, 0, 0, #options * 20)
     end)
 
-    -- Регистрация флага
     if flagName then
         local Lib = import("init.lua")
         Lib:RegisterFlag(flagName, selected, function(val)

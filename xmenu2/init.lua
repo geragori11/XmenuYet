@@ -3,16 +3,15 @@ local Library = {}
 Library.__index = Library
 
 local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 Library.Theme = import("src/Theme.lua")
 Library.Draggable = import("src/Draggable.lua")
 Library.ConfigManager = import("src/ConfigManager.lua")
 
--- Глобальный реестр флагов (состояний функций для конфигов)
 Library.Flags = {}
 Library.ActiveUI = nil
+Library.Modules = {}   -- хранит все зарегистрированные модули
 
 function Library.new(title)
     local self = setmetatable({}, Library)
@@ -27,6 +26,8 @@ function Library.new(title)
     self.ToggleKey = Enum.KeyCode.K
     self.DefaultWidth = 190
     self.ColumnHeight = 420
+    self.Modules = {}
+    self.ColorPickerOverlay = nil   -- для оверлея ColorPicker (вместо _G)
 
     Library.ActiveUI = self
 
@@ -130,7 +131,6 @@ function Library:ShowConfirm(title, message, onYes, onNo)
     end)
 end
 
--- Проверка перекрытия более чем на порог
 function Library:IsOverlappingMoreThan(frame1, frame2, threshold)
     local absPos1 = frame1.AbsolutePosition
     local absSize1 = frame1.AbsoluteSize
@@ -159,7 +159,14 @@ function Library:AddColumn(title, customWidth)
     columnFrame.Name = title .. "Column"
     columnFrame.Size = UDim2.new(0, width, 0, self.ColumnHeight)
 
-    local initialPos = UDim2.new(0, 20 + (#self.Columns * (self.DefaultWidth + 10)), 0, 50)
+    -- Вычисляем позицию: ставим справа от последней колонки, если есть
+    local lastCol = self.Columns[#self.Columns]
+    local xOffset = 20
+    if lastCol then
+        local lastPos = lastCol.Frame.Position
+        xOffset = lastPos.X.Offset + width + 10
+    end
+    local initialPos = UDim2.new(0, xOffset, 0, 50)
     columnFrame.Position = initialPos
     columnFrame.BackgroundColor3 = Library.Theme.ColumnBackground
     columnFrame.BorderSizePixel = 0
@@ -199,27 +206,41 @@ function Library:AddColumn(title, customWidth)
     container.CanvasSize = UDim2.new(0, 0, 0, 0)
     container.Parent = columnFrame
 
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Padding = UDim.new(0, 6)
-    listLayout.Parent = container
+    -- UIListLayout для системных элементов (сверху)
+    local sysLayout = Instance.new("UIListLayout")
+    sysLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    sysLayout.Padding = UDim.new(0, 6)
+    sysLayout.Parent = container
 
     local padding = Instance.new("UIPadding")
     padding.PaddingTop = UDim.new(0, 2)
     padding.PaddingBottom = UDim.new(0, 6)
     padding.Parent = container
 
+    -- Контейнер для модулей (заполняется в RenderModules)
+    local modulesContainer = Instance.new("Frame")
+    modulesContainer.Name = "ModulesContainer"
+    modulesContainer.Size = UDim2.new(1, 0, 0, 0)
+    modulesContainer.AutomaticSize = Enum.AutomaticSize.Y
+    modulesContainer.BackgroundTransparency = 1
+    modulesContainer.LayoutOrder = 1
+    modulesContainer.Parent = container
+
+    local modulesLayout = Instance.new("UIListLayout")
+    modulesLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    modulesLayout.Padding = UDim.new(0, 6)
+    modulesLayout.Parent = modulesContainer
+
     local colObj = {
         Title = title,
         Frame = columnFrame,
         Container = container,
+        ModulesContainer = modulesContainer,
         InitialPos = initialPos,
         Library = self
     }
 
-    -- Подключаем перетаскивание с одним колбэком, который получает frame и startPos
     Library.Draggable.Enable(columnFrame, header, function(frame, startPos)
-        -- Проверяем перекрытие с другими колонками
         local overlap = false
         for _, otherCol in ipairs(self.Columns) do
             if otherCol.Frame ~= frame then
@@ -231,10 +252,8 @@ function Library:AddColumn(title, customWidth)
         end
 
         if overlap then
-            -- Возвращаем на стартовую позицию
             frame.Position = startPos
         else
-            -- Сохраняем текущую позицию как новую стартовую для будущих перетаскиваний
             colObj.InitialPos = frame.Position
         end
     end)
@@ -251,6 +270,93 @@ function Library:GetColumn(title)
         end
     end
     return nil
+end
+
+-- Добавление модуля (сохраняется в список)
+function Library:AddModule(module)
+    if not module or not module.Name or not module.Page then
+        warn("[Library] Модуль должен содержать поля Name и Page")
+        return
+    end
+    table.insert(self.Modules, module)
+end
+
+-- Рендер всех модулей по колонкам и секциям
+function Library:RenderModules()
+    -- Группируем модули по колонкам и секциям
+    local grouped = {}
+    for _, mod in ipairs(self.Modules) do
+        local page = mod.Page
+        if not grouped[page] then
+            grouped[page] = {}
+        end
+        local section = mod.Section or "Общие"
+        if not grouped[page][section] then
+            grouped[page][section] = {}
+        end
+        table.insert(grouped[page][section], mod)
+    end
+
+    for _, col in ipairs(self.Columns) do
+        local modulesContainer = col.ModulesContainer
+        -- Очищаем всё кроме UIListLayout
+        for _, child in ipairs(modulesContainer:GetChildren()) do
+            if not child:IsA("UIListLayout") then
+                child:Destroy()
+            end
+        end
+
+        local pageModules = grouped[col.Title]
+        if pageModules then
+            local sectionNames = {}
+            for sec, _ in pairs(pageModules) do
+                table.insert(sectionNames, sec)
+            end
+            table.sort(sectionNames) -- сортируем секции по алфавиту
+
+            local layoutOrder = 0
+            for _, secName in ipairs(sectionNames) do
+                local mods = pageModules[secName]
+                if #mods > 0 then
+                    -- Заголовок секции
+                    local header = Instance.new("TextLabel")
+                    header.Name = "Section_" .. secName
+                    header.Size = UDim2.new(1, 0, 0, 20)
+                    header.BackgroundTransparency = 1
+                    header.Text = secName:upper()
+                    header.TextColor3 = Library.Theme.SectionHeader
+                    header.Font = Enum.Font.SourceSansBold
+                    header.TextSize = 12
+                    header.TextXAlignment = Enum.TextXAlignment.Left
+                    header.LayoutOrder = layoutOrder
+                    layoutOrder = layoutOrder + 1
+                    header.Parent = modulesContainer
+
+                    local AddToggle = import("src/Elements/Toggle.lua")
+                    for _, mod in ipairs(mods) do
+                        local flagName = "Module_" .. mod.Name .. "_" .. tostring(math.random(100000)) -- для уникальности, но можно использовать mod.Name, если он уникален
+                        local toggleObj = AddToggle(
+                            modulesContainer,
+                            mod.Name,
+                            mod.Default or false,
+                            flagName,
+                            function(state)
+                                if mod.OnToggle then
+                                    mod.OnToggle(state)
+                                end
+                            end
+                        )
+                        toggleObj.main.LayoutOrder = layoutOrder
+                        layoutOrder = layoutOrder + 1
+
+                        if mod.Settings then
+                            mod.Settings(toggleObj.settings)
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
 return Library

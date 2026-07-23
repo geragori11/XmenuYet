@@ -9,7 +9,6 @@ local Theme = {
     AccentColor = Color3.fromRGB(0, 140, 255),
     SubTextColor = Color3.fromRGB(160, 160, 175),
 
-    -- Радиусы скругления
     ColumnCorner = UDim.new(0, 8),
     ElementCorner = UDim.new(0, 6)
 }

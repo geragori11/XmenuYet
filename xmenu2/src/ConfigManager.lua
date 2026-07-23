@@ -1,24 +1,16 @@
 -- [File: src/ConfigManager.lua]
 local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
 local Theme = import("src/Theme.lua")
-local Library = import("init.lua")   -- <-- добавлен импорт
+local Library = import("init.lua")
 
 local ConfigManager = {}
 ConfigManager.FolderPath = "xmenu2_configs"
 ConfigManager.ValidConfigs = {}
-ConfigManager.ScanTimer = 0
-ConfigManager.ScanInterval = 0.4
+ConfigManager.RefreshList = nil
 
--- ===== Сериализация / десериализация =====
 function ConfigManager.SerializeValue(val)
     if type(val) == "table" and val.R and val.G and val.B then
-        return {
-            __type = "Color3",
-            R = val.R,
-            G = val.G,
-            B = val.B
-        }
+        return { __type = "Color3", R = val.R, G = val.G, B = val.B }
     else
         return val
     end
@@ -32,7 +24,6 @@ function ConfigManager.DeserializeValue(val)
     end
 end
 
--- ===== Вспомогательные функции =====
 function ConfigManager.EnsureFolder()
     if not isfolder(ConfigManager.FolderPath) then
         makefolder(ConfigManager.FolderPath)
@@ -75,7 +66,7 @@ function ConfigManager.ScanFolder()
                     table.insert(valid, name)
                 end
             else
-                warn("[Config] ⚠️ Повреждённый файл (пропущен):", filePath)
+                warn("[Config] Повреждённый файл (пропущен):", filePath)
             end
         end
     end
@@ -83,7 +74,6 @@ function ConfigManager.ScanFolder()
     return valid
 end
 
--- ===== Основные операции =====
 function ConfigManager.Save(configName, libraryObj)
     configName = ConfigManager.NormalizeConfigName(configName)
     if not configName or configName == "" then
@@ -96,13 +86,12 @@ function ConfigManager.Save(configName, libraryObj)
 
     local function DoSave()
         local saveTable = {}
-        -- Используем глобальный реестр Library.Flags
         for flagKey, flagData in pairs(Library.Flags) do
             saveTable[flagKey] = ConfigManager.SerializeValue(flagData.Value)
         end
         local json = HttpService:JSONEncode(saveTable)
         writefile(path, json)
-        print("[Config] ✅ Сохранён:", configName)
+        print("[Config] Сохранён:", configName)
         ConfigManager.ValidConfigs = ConfigManager.ScanFolder()
         if ConfigManager.RefreshList then ConfigManager.RefreshList() end
     end
@@ -112,7 +101,7 @@ function ConfigManager.Save(configName, libraryObj)
             "Перезапись конфига",
             "Вы точно хотите сохранить изменения в уже существующий конфиг '" .. configName .. "'?",
             DoSave,
-            function() print("[Config] ❌ Сохранение отменено") end
+            function() print("[Config] Сохранение отменено") end
         )
     else
         DoSave()
@@ -124,19 +113,23 @@ function ConfigManager.Load(configName, libraryObj)
     if not configName or configName == "" then return end
     local path = ConfigManager.GetFilePath(configName)
     if isfile(path) then
-        local raw = readfile(path)
-        local data = HttpService:JSONDecode(raw)
-        if data then
+        local success, data = pcall(function()
+            local raw = readfile(path)
+            return HttpService:JSONDecode(raw)
+        end)
+        if success and data then
             for flagKey, storedVal in pairs(data) do
                 if Library.Flags[flagKey] and Library.Flags[flagKey].Set then
                     local value = ConfigManager.DeserializeValue(storedVal)
                     Library.Flags[flagKey].Set(value)
                 end
             end
-            print("[Config] ✅ Загружен:", configName)
+            print("[Config] Загружен:", configName)
+        else
+            warn("[Config] Ошибка загрузки файла:", configName)
         end
     else
-        print("[Config] ❌ Файл не найден:", path)
+        print("[Config] Файл не найден:", path)
     end
 end
 
@@ -146,15 +139,14 @@ function ConfigManager.Delete(configName)
     local path = ConfigManager.GetFilePath(configName)
     if isfile(path) then
         delfile(path)
-        print("[Config] 🗑️ Удалён:", configName)
+        print("[Config] Удалён:", configName)
         ConfigManager.ValidConfigs = ConfigManager.ScanFolder()
         if ConfigManager.RefreshList then ConfigManager.RefreshList() end
     else
-        print("[Config] ❌ Файл не найден для удаления:", path)
+        print("[Config] Файл не найден для удаления:", path)
     end
 end
 
--- ===== Отрисовка UI =====
 function ConfigManager.RenderUI(container, libraryObj)
     local AddTextInput = import("src/Elements/TextInput.lua")
     local currentConfigName = "default"
@@ -212,7 +204,6 @@ function ConfigManager.RenderUI(container, libraryObj)
             emptyLabel.Parent = listFrame
         else
             listFrame.Size = UDim2.new(1, 0, 0, fileCount * 34)
-
             for idx, displayName in ipairs(validNames) do
                 local card = Instance.new("Frame")
                 card.Size = UDim2.new(1, 0, 0, 30)
@@ -277,45 +268,12 @@ function ConfigManager.RenderUI(container, libraryObj)
         if currentConfigName and currentConfigName ~= "" then
             ConfigManager.Save(currentConfigName, libraryObj)
         else
-            print("[Config] ⚠️ Имя конфига не может быть пустым")
+            print("[Config] Имя конфига не может быть пустым")
         end
     end)
 
     ConfigManager.ValidConfigs = ConfigManager.ScanFolder()
     ConfigManager.RefreshList()
-
-    local heartbeatConnection
-    heartbeatConnection = RunService.Heartbeat:Connect(function(deltaTime)
-        ConfigManager.ScanTimer = ConfigManager.ScanTimer + deltaTime
-        if ConfigManager.ScanTimer >= ConfigManager.ScanInterval then
-            ConfigManager.ScanTimer = 0
-            local newValid = ConfigManager.ScanFolder()
-            local changed = false
-            if #newValid ~= #ConfigManager.ValidConfigs then
-                changed = true
-            else
-                for i = 1, #newValid do
-                    if newValid[i] ~= ConfigManager.ValidConfigs[i] then
-                        changed = true
-                        break
-                    end
-                end
-            end
-            if changed then
-                ConfigManager.ValidConfigs = newValid
-                ConfigManager.RefreshList()
-            end
-        end
-    end)
-
-    container.AncestryChanged:Connect(function()
-        if not container:IsDescendantOf(game) then
-            if heartbeatConnection then
-                heartbeatConnection:Disconnect()
-                heartbeatConnection = nil
-            end
-        end
-    end)
 end
 
 return ConfigManager

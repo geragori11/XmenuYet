@@ -4,7 +4,7 @@ local Register = import("register.lua")
 
 local AddDropdown = import("src/Elements/Dropdown.lua")
 
--- 1. Сначала создаём объект UI
+-- 1. Создаём объект UI
 local UI = Library.new("XClientMenu")
 
 -- 2. Создаём базовые колонки
@@ -22,7 +22,12 @@ AddDropdown(configCol.Container, "Бинд меню", keyNames, function(selecte
     end
 end)
 
+-- Отрисовываем конфиги
 Library.ConfigManager.RenderUI(configCol.Container, UI)
 
--- 4. Теперь регистрируем модули!
+-- 4. Регистрируем модули!
 Register.newmodule("Combat/Killaura")
+-- Можно добавить другие модули аналогично
+
+-- После регистрации всех модулей вызываем рендер (отрисовка в колонках)
+UI:RenderModules()

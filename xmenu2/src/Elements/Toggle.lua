@@ -32,6 +32,19 @@ return function(container, text, default, flagName, callback)
     corner.CornerRadius = Theme.ElementCorner
     corner.Parent = button
 
+    -- Кнопка-шестерёнка для открытия настроек
+    local settingsBtn = Instance.new("TextButton")
+    settingsBtn.Size = UDim2.new(0, 28, 0, 22)
+    settingsBtn.Position = UDim2.new(1, -32, 0.5, -11)
+    settingsBtn.BackgroundTransparency = 1
+    settingsBtn.Text = "⚙"
+    settingsBtn.TextColor3 = Theme.SubTextColor
+    settingsBtn.Font = Enum.Font.SourceSans
+    settingsBtn.TextSize = 14
+    settingsBtn.AutoButtonColor = false
+    settingsBtn.ZIndex = 2
+    settingsBtn.Parent = button
+
     local optionsFrame = Instance.new("Frame")
     optionsFrame.Name = "OptionsFrame"
     optionsFrame.Size = UDim2.new(1, 0, 0, 0)
@@ -69,11 +82,14 @@ return function(container, text, default, flagName, callback)
         end
     end
 
-    button.MouseButton1Click:Connect(function()
+    button.MouseButton1Click:Connect(function(input)
+        if input and input.Target and input.Target:IsDescendantOf(settingsBtn) then
+            return
+        end
         setState(not state)
     end)
 
-    button.MouseButton2Click:Connect(function()
+    settingsBtn.MouseButton1Click:Connect(function()
         optionsFrame.Visible = not optionsFrame.Visible
     end)
 

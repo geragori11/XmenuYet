@@ -50,8 +50,6 @@ return function(container, text, min, max, default, callback, flagName)
         fill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
         label.Text = text .. ": " .. tostring(value)
         if callback then callback(value) end
-
-        -- ОБНОВЛЕНИЕ ГЛОБАЛЬНОГО ФЛАГА
         if flagName then
             local Lib = import("init.lua")
             if Lib.Flags and Lib.Flags[flagName] then
@@ -87,7 +85,6 @@ return function(container, text, min, max, default, callback, flagName)
         end
     end)
 
-    -- Регистрация флага
     if flagName then
         local Lib = import("init.lua")
         Lib:RegisterFlag(flagName, value, function(val)
