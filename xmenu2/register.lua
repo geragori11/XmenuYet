@@ -4,7 +4,6 @@ local Library = import("init.lua")
 local Register = {}
 
 function Register.newmodule(path)
-    -- path например "Combat/Killaura"
     local module = import("modules/" .. path .. ".lua")
     if not module then
         warn("[Register] Модуль не найден:", path)

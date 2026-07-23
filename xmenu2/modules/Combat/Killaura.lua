@@ -1,6 +1,6 @@
 -- [File: modules/Combat/Killaura.lua]
 local AddSlider = import("src/Elements/Slider.lua")
-local AddColorPicker = import("src/Elements/ColorPicker.lua")  -- теперь это улучшенная версия
+local AddColorPicker = import("src/Elements/ColorPicker.lua")
 
 return {
     Page = "Combat",
@@ -13,7 +13,6 @@ return {
     end,
 
     Settings = function(container)
-        -- Слайдер радиуса (остаётся без изменений)
         AddSlider(
             container,
             "Радиус атаки",
@@ -26,19 +25,16 @@ return {
             "Killaura_Radius"
         )
 
-        -- Теперь используем улучшенный ColorPicker
         AddColorPicker(
             container,
             "Цвет таргета",
-            Color3.fromRGB(255, 0, 0),   -- цвет по умолчанию (красный)
+            Color3.fromRGB(255, 0, 0),
             function(color)
                 print("[Killaura] Цвет установлен:", color)
-                -- Здесь можно применить цвет к чему-то (например, к подсветке)
             end,
-            "Killaura_TargetColor"        -- уникальный флаг для сохранения
+            "Killaura_TargetColor"
         )
 
-        -- Можно добавить ещё один ColorPicker, если нужно
         AddColorPicker(
             container,
             "Цвет круга атаки",

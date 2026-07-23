@@ -1,4 +1,24 @@
 -- [File: example.lua]
+-- Реализация функции import (кеширование и загрузка файлов)
+local loadedModules = {}
+function import(path)
+    if loadedModules[path] then
+        return loadedModules[path]
+    end
+    local content = readfile(path)
+    if not content then
+        error("File not found: " .. path)
+    end
+    local func, err = loadstring(content, "@" .. path)
+    if not func then
+        error("Error loading " .. path .. ": " .. err)
+    end
+    local result = func()
+    loadedModules[path] = result
+    return result
+end
+
+-- Основной код
 local Library = import("init.lua")
 local Register = import("register.lua")
 

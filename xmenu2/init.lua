@@ -11,7 +11,7 @@ Library.ConfigManager = import("src/ConfigManager.lua")
 
 Library.Flags = {}
 Library.ActiveUI = nil
-Library.Modules = {}   -- хранит все зарегистрированные модули
+Library.Modules = {}
 
 function Library.new(title)
     local self = setmetatable({}, Library)
@@ -27,7 +27,7 @@ function Library.new(title)
     self.DefaultWidth = 190
     self.ColumnHeight = 420
     self.Modules = {}
-    self.ColorPickerOverlay = nil   -- для оверлея ColorPicker (вместо _G)
+    self.ColorPickerOverlay = nil
 
     Library.ActiveUI = self
 
@@ -159,7 +159,6 @@ function Library:AddColumn(title, customWidth)
     columnFrame.Name = title .. "Column"
     columnFrame.Size = UDim2.new(0, width, 0, self.ColumnHeight)
 
-    -- Вычисляем позицию: ставим справа от последней колонки, если есть
     local lastCol = self.Columns[#self.Columns]
     local xOffset = 20
     if lastCol then
@@ -206,7 +205,6 @@ function Library:AddColumn(title, customWidth)
     container.CanvasSize = UDim2.new(0, 0, 0, 0)
     container.Parent = columnFrame
 
-    -- UIListLayout для системных элементов (сверху)
     local sysLayout = Instance.new("UIListLayout")
     sysLayout.SortOrder = Enum.SortOrder.LayoutOrder
     sysLayout.Padding = UDim.new(0, 6)
@@ -217,7 +215,6 @@ function Library:AddColumn(title, customWidth)
     padding.PaddingBottom = UDim.new(0, 6)
     padding.Parent = container
 
-    -- Контейнер для модулей (заполняется в RenderModules)
     local modulesContainer = Instance.new("Frame")
     modulesContainer.Name = "ModulesContainer"
     modulesContainer.Size = UDim2.new(1, 0, 0, 0)
@@ -272,7 +269,6 @@ function Library:GetColumn(title)
     return nil
 end
 
--- Добавление модуля (сохраняется в список)
 function Library:AddModule(module)
     if not module or not module.Name or not module.Page then
         warn("[Library] Модуль должен содержать поля Name и Page")
@@ -281,9 +277,7 @@ function Library:AddModule(module)
     table.insert(self.Modules, module)
 end
 
--- Рендер всех модулей по колонкам и секциям
 function Library:RenderModules()
-    -- Группируем модули по колонкам и секциям
     local grouped = {}
     for _, mod in ipairs(self.Modules) do
         local page = mod.Page
@@ -299,7 +293,6 @@ function Library:RenderModules()
 
     for _, col in ipairs(self.Columns) do
         local modulesContainer = col.ModulesContainer
-        -- Очищаем всё кроме UIListLayout
         for _, child in ipairs(modulesContainer:GetChildren()) do
             if not child:IsA("UIListLayout") then
                 child:Destroy()
@@ -312,13 +305,12 @@ function Library:RenderModules()
             for sec, _ in pairs(pageModules) do
                 table.insert(sectionNames, sec)
             end
-            table.sort(sectionNames) -- сортируем секции по алфавиту
+            table.sort(sectionNames)
 
             local layoutOrder = 0
             for _, secName in ipairs(sectionNames) do
                 local mods = pageModules[secName]
                 if #mods > 0 then
-                    -- Заголовок секции
                     local header = Instance.new("TextLabel")
                     header.Name = "Section_" .. secName
                     header.Size = UDim2.new(1, 0, 0, 20)
@@ -334,7 +326,7 @@ function Library:RenderModules()
 
                     local AddToggle = import("src/Elements/Toggle.lua")
                     for _, mod in ipairs(mods) do
-                        local flagName = "Module_" .. mod.Name .. "_" .. tostring(math.random(100000)) -- для уникальности, но можно использовать mod.Name, если он уникален
+                        local flagName = "Module_" .. mod.Name .. "_" .. tostring(math.random(100000))
                         local toggleObj = AddToggle(
                             modulesContainer,
                             mod.Name,
